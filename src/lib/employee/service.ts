@@ -279,6 +279,11 @@ export async function createReleaseNote(db: Db, principal: Principal, audit: Aud
 
 // ---------------------------------------------------------------- publishing console
 
+/** Checked by upload routes BEFORE they read a body, so a non-publisher is refused (403) rather than erroring while parsing. */
+export async function assertPublisher(principal: Principal, audit: AuditSink) {
+  await requirePermission({ ...guard(principal, audit), subjectType: "media_asset" }, "publish_media", EMPLOYEE);
+}
+
 export const PUBLISH_AUDIENCES = ["employee", "public", "tenant", "entitled"] as const;
 
 export const liveSessionSchema = z

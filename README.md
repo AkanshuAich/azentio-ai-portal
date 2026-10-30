@@ -1,6 +1,10 @@
 # azentio.ai: Website & Intelligent Collaboration Portal
 
-Next.js 15 + Postgres. Access is enforced on the server by one policy engine (`src/lib/authz`).
+A Next.js 15 + Postgres build of the hackathon brief: a public website, an employee portal, an organisation-scoped
+client portal, and a governed collective-learning workflow. **Access is enforced on the server** by one policy engine
+(`src/lib/authz`), with Postgres row-level security as a second layer.
+
+## Run it
 
 ```bash
 cp .env.example .env.local
@@ -10,34 +14,58 @@ npm run db:migrate && npm run db:seed
 npm run dev
 ```
 
+Sign in at `/signin`. No email provider is wired in: codes and invitation links appear at `/dev/mailbox` (development
+only). Seeded demo users (all fictional):
+
+| Persona | Email |
+|---|---|
+| Ordinary employee | priya.nair@azentio.com |
+| Moderator (`learning.moderate`) | omar.haddad@azentio.com |
+| Publisher (`media.publish`) | lena.fischer@azentio.com |
+| Product owner (`ideas.manage`) | ravi.menon@azentio.com |
+| Portal administrator | sam.okafor@azentio.com |
+| Meridian client admin / member | amira.khan@meridian.example / tariq.aziz@meridian.example |
+| Nusantara client admin / member | dewi.lestari@nusantara.example / budi.santoso@nusantara.example |
+| Zahra / Atlas client admins | fatima.zahra@zahra.example / john.mercer@atlas.example |
+| Two-workspace advisor | yusuf.advisor@advisory.example |
+
+The brief's illustrative scenario (three clients, seasonal SME cash flow, a "Seasonality context" theme with a
+small-sample warning, an Under-review idea) is seeded and replayable.
+
+## Verify it
+
 ```bash
-npm test            # policy engine + acceptance tests
-npm run typecheck
+npm test              # unit + acceptance suite against a throwaway database
+npm run typecheck && npm run lint
+npm run test:e2e      # Playwright persona journeys in a real browser (Edge by default; E2E_CHANNEL=chrome)
 ```
 
-Status: Phases 0-5 complete.
-- Phase 0: schema, design tokens, authz policy engine, audit sink, seed.
-- Phase 1: email-code sign-in, organiser-approved employee provisioning, single-use invitations,
-  terms step, active-workspace switcher, CSRF origin checks.
-- Phase 2: branded public site (home, products, solutions, technology, lab, media, insights, about),
-  demo-enquiry and hackathon forms with shared client/server validation, public AIRA over public content only.
-- Phase 3: employee portal (dashboard, guided Playground on synthetic scenarios, internal live sessions and
-  recordings, experiments, hackathon spaces, knowledge library, release notes), publishing console behind the
-  separate media.publish grant, private storage with a gated /api/media route.
-- Phase 4: client portal (organisation dashboard with empty states, entitled sandboxes with tenant- and
-  user-isolated runs and saved scenarios, member and invitation administration, resources, bookmarks, comments
-  that inherit their parent audience with reporting and moderation, in-app notifications, support requests).
-- Phase 5: collective-learning workflow (private drafts, four separate consents, submit/return/amend/withdraw,
-  moderation with redaction, publish/unpublish/restore, reports, synchronous withdrawal fan-out), shared feed with
-  search/filters/saved searches/export, themes with distinct-organisation suppression, improvement ideas with audited
-  status, and signed-in AIRA (Claude with a deterministic fallback).
-Not yet built: documentation set, Playwright journeys, Postgres row-level security, route-coverage test.
+The acceptance tests are named after the brief's clauses; see
+[docs/requirements-traceability.md](docs/requirements-traceability.md). Key controls have been **mutation-checked**
+(deliberately broken, and a test failed).
 
-Local notes
-- AIRA uses Claude when ANTHROPIC_API_KEY is set (model claude-opus-5-5, override with AIRA_MODEL) and otherwise a
-  deterministic retrieval summary. It has not been exercised against the live API in this build.
-- Uploaded media lives in ./storage (gitignored) and is only served through /api/media/[id].
-- Postgres runs on host port 5433 (5432 is often taken by a local install).
-- No email provider is wired in: sign-in codes and invitation links land in the outbox and are shown at
-  /dev/mailbox in development only. Production refuses to start sending until MAIL_TRANSPORT is set.
-- Tests recreate a throwaway `azentio_test` database from the real migrations on every run.
+## Documentation
+
+| | |
+|---|---|
+| [docs/access-model.md](docs/access-model.md) | personas, grants, audiences, enforcement layers |
+| [docs/threat-model.md](docs/threat-model.md) | threats, mitigations, evidence, residual risks |
+| [docs/consent-and-retention.md](docs/consent-and-retention.md) | consent model, withdrawal and its limits, retention schedule |
+| [docs/federated-learning-design.md](docs/federated-learning-design.md) | the optional P2 track: designed, not built |
+| [docs/requirements-traceability.md](docs/requirements-traceability.md) | every requirement: where, how tested, honest status |
+
+## Honest limits
+
+- **Email is not delivered.** Production refuses to send until a provider adapter is set (`MAIL_TRANSPORT`). Nothing is
+  ever labelled "delivered".
+- **AIRA's live Claude call has not run against the real API** in this build. With `ANTHROPIC_API_KEY` set it uses
+  `claude-opus-5-5` (override with `AIRA_MODEL`); without it, or on any failure, it falls back to a labelled retrieval
+  summary. Retrieval is lexical (Postgres full text), not embeddings.
+- **The federated-learning track (P2) is designed, not built.**
+- **Retention periods are proposed, and automated purge jobs are not implemented.**
+- **RLS covers the `withTenant()` paths**; connect the web app as a non-owner role before production.
+- Uploaded media and recordings use local disk and placeholder slates, not real video.
+- A minimum cohort size is not a privacy guarantee. Production thresholds need approval.
+
+Postgres runs on host port **5433** (5432 is often taken). Uploaded files live in `./storage` (gitignored) and are
+served only through `/api/media/[id]`.

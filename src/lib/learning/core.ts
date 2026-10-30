@@ -1,7 +1,7 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
 import {
-  appState, contributionEvents, contributions, organizations, products,
+  appState, contributionEvents, contributions, notifications, organizations, platformGrants, products,
 } from "@/lib/db/schema";
 import { ForbiddenError, type AuditSink } from "@/lib/authz/guard";
 import type { Principal, Resource } from "@/lib/authz/types";
@@ -93,6 +93,20 @@ export async function applyTransition(
 /** Tells the author about a state change, in-app only. Never claims an email was sent. */
 export async function tellAuthor(db: Db, c: Pick<Contribution, "authorId" | "title">, message: string) {
   await notify(db, c.authorId, `${message}: "${c.title}"`, "/workspace/observations");
+}
+
+/**
+ * In-app note to everyone currently holding the moderation grant. It says only that something is waiting:
+ * no title, no organisation, nothing from the contribution.
+ */
+export async function notifyModerators(db: Db, message: string) {
+  const grants = await db
+    .select({ userId: platformGrants.userId })
+    .from(platformGrants)
+    .where(and(eq(platformGrants.permission, "learning.moderate"), or(isNull(platformGrants.expiresAt), gt(platformGrants.expiresAt, new Date()))));
+  const ids = [...new Set(grants.map((x) => x.userId))];
+  // One insert for everyone, not one round trip each.
+  if (ids.length) await db.insert(notifications).values(ids.map((userId) => ({ userId, message, href: "/employee/moderation" })));
 }
 
 export function isAuthor(principal: Principal, c: Pick<Contribution, "authorId" | "orgId">): boolean {

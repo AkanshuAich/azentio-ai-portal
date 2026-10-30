@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { authedRoute } from "@/lib/auth/http";
 import { MAX_UPLOAD_BYTES } from "@/lib/storage/private";
-import { uploadMedia } from "@/lib/employee/service";
+import { assertPublisher, uploadMedia } from "@/lib/employee/service";
 
 export const POST = authedRoute(async (req, { db, session, audit }) => {
+  // Authorise first: nothing about the body is read, sized or parsed for someone without the grant.
+  await assertPublisher(session.principal, audit);
   const declared = Number(req.headers.get("content-length") ?? 0);
   if (declared > MAX_UPLOAD_BYTES + 64 * 1024) return NextResponse.json({ error: "upload_rejected", reason: "file is too large" }, { status: 413 });
 

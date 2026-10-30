@@ -6,8 +6,9 @@ import type { AuditSink } from "@/lib/authz/guard";
 import { can } from "@/lib/authz/policy";
 import type { Principal } from "@/lib/authz/types";
 import { clientTenantOf, requireClientTenant } from "@/lib/client/service";
+import { withTenant } from "@/lib/db/tenant";
 import {
-  NotFoundError, applyTransition, assertOfferingExists, isAuthor, knownClientNames, orgVisible, refuse, sourceResource, tellAuthor,
+  NotFoundError, applyTransition, assertOfferingExists, isAuthor, knownClientNames, notifyModerators, orgVisible, refuse, sourceResource, tellAuthor,
   type Contribution,
 } from "./core";
 import { STATUS_LABEL, authorCanEdit, type Status } from "./lifecycle";
@@ -43,9 +44,10 @@ async function recordConsents(db: Db, contributionId: string, next: Partial<Cons
 // ---------------------------------------------------------------- create and edit
 
 async function loadMine(db: Db, principal: Principal, audit: AuditSink, id: string): Promise<Contribution> {
-  await requireClientTenant(principal, audit);
+  const orgId = await requireClientTenant(principal, audit);
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new NotFoundError();
-  const [c] = await db.select().from(contributions).where(eq(contributions.id, id));
+  // Read through row-level security: even without the policy check below, Postgres would not return another tenant's row.
+  const [c] = await withTenant(db, orgId, (q) => q.select().from(contributions).where(eq(contributions.id, id)));
   // Another tenant's record is indistinguishable from one that does not exist.
   if (!c || !can(principal, "read", sourceResource(c)).allow) throw new NotFoundError();
   return c;
@@ -128,6 +130,7 @@ export async function updateContribution(db: Db, principal: Principal, audit: Au
   });
   await after();
   await tellAuthor(db, c, "Your edit was sent for renewed review. The reviewed version already shared stays as it was until the new one is approved");
+  await notifyModerators(db, "An edit to a shared contribution is waiting for renewed review");
   return { id, status: "submitted" as Status, newVersion: true, sensitiveFlags: flags };
 }
 
@@ -157,6 +160,7 @@ export async function submitContribution(db: Db, principal: Principal, audit: Au
   });
   await after();
   await tellAuthor(db, c, "Submitted for review. You'll be told here when its status changes");
+  await notifyModerators(db, c.status === "returned" ? "A returned contribution was amended and is waiting for review" : "A contribution was submitted and is waiting for review");
   return { id, status: "submitted" as Status, sensitiveFlags: flags };
 }
 
@@ -216,7 +220,7 @@ export type ContributionSummary = ReturnType<typeof summary>;
 export async function listMine(db: Db, principal: Principal): Promise<ContributionSummary[]> {
   const orgId = clientTenantOf(principal);
   if (!orgId) return [];
-  const rows = await db.select().from(contributions).where(and(eq(contributions.orgId, orgId), eq(contributions.authorId, principal.userId))).orderBy(desc(contributions.updatedAt));
+  const rows = await withTenant(db, orgId, (q) => q.select().from(contributions).where(and(eq(contributions.orgId, orgId), eq(contributions.authorId, principal.userId))).orderBy(desc(contributions.updatedAt)));
   return rows.map((r) => summary(r));
 }
 
@@ -228,12 +232,12 @@ export async function listMine(db: Db, principal: Principal): Promise<Contributi
 export async function listOrganisation(db: Db, principal: Principal): Promise<ContributionSummary[]> {
   const orgId = clientTenantOf(principal);
   if (!orgId) return [];
-  const rows = await db
+  const rows = await withTenant(db, orgId, (q) => q
     .select({ c: contributions, author: users.displayName })
     .from(contributions)
     .innerJoin(users, eq(users.id, contributions.authorId))
     .where(and(eq(contributions.orgId, orgId), or(isNotNull(contributions.orgSharedAt), and(ne(contributions.status, "draft"), eq(contributions.sharingChoice, "propose_shared")))))
-    .orderBy(desc(contributions.updatedAt));
+    .orderBy(desc(contributions.updatedAt)));
   return rows.map((r) => summary(r.c, r.author));
 }
 

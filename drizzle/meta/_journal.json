@@ -64,6 +64,13 @@
       "when": 1793373727050,
       "tag": "0008_youthful_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793376119961,
+      "tag": "0009_row_level_security",
+      "breakpoints": true
     }
   ]
 }

@@ -52,6 +52,7 @@ function fail(e: unknown): NextResponse {
   if (e instanceof LifecycleError) return NextResponse.json({ error: "illegal_transition", from: e.from, to: e.to }, { status: 409 });
   if (e instanceof NotFoundError) return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (e instanceof UploadRejected) return NextResponse.json({ error: "upload_rejected", reason: e.reason }, { status: 400 });
+  if (e instanceof SyntaxError || (e instanceof TypeError && /Content-Type|body/i.test(e.message))) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   if (e instanceof ZodError) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   console.error(e);
   return NextResponse.json({ error: "server_error" }, { status: 500 });

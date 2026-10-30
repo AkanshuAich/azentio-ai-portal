@@ -11,6 +11,7 @@ import { can } from "@/lib/authz/policy";
 import type { Principal } from "@/lib/authz/types";
 import { NotFoundError } from "@/lib/employee/service";
 import { SCENARIOS, feedbackSchema, getScenario } from "@/lib/playground/scenarios";
+import { withTenant } from "@/lib/db/tenant";
 
 const refuse = (reason: string) => new ForbiddenError({ allow: false, reason });
 
@@ -148,12 +149,12 @@ export async function runSandbox(db: Db, principal: Principal, audit: AuditSink,
 export async function listMySandboxRuns(db: Db, principal: Principal, limit = 8) {
   const orgId = clientTenantOf(principal);
   if (!orgId) return [];
-  return db
+  return withTenant(db, orgId, (q) => q
     .select({ id: playgroundRuns.id, scenarioId: playgroundRuns.scenarioId, createdAt: playgroundRuns.createdAt, feedback: playgroundRuns.feedback })
     .from(playgroundRuns)
     .where(and(eq(playgroundRuns.userId, principal.userId), eq(playgroundRuns.orgId, orgId)))
     .orderBy(desc(playgroundRuns.createdAt))
-    .limit(limit);
+    .limit(limit));
 }
 
 export async function saveSandboxFeedback(db: Db, principal: Principal, audit: AuditSink, runId: string, raw: unknown) {
@@ -191,12 +192,12 @@ export async function saveScenario(db: Db, principal: Principal, audit: AuditSin
 export async function listSavedScenarios(db: Db, principal: Principal) {
   const orgId = clientTenantOf(principal);
   if (!orgId) return [];
-  const rows = await db
+  const rows = await withTenant(db, orgId, (q) => q
     .select({ s: savedScenarios, author: users.displayName })
     .from(savedScenarios)
     .innerJoin(users, eq(users.id, savedScenarios.userId))
     .where(and(eq(savedScenarios.orgId, orgId), or(eq(savedScenarios.userId, principal.userId), eq(savedScenarios.visibility, "organisation"))))
-    .orderBy(desc(savedScenarios.createdAt));
+    .orderBy(desc(savedScenarios.createdAt)));
   // Entitlement can be withdrawn after saving: stop surfacing scenarios for products no longer entitled.
   return rows
     .filter((r) => { const sc = getScenario(r.s.scenarioId); return sc && principal.entitlements.has(sc.meta.productSlug); })

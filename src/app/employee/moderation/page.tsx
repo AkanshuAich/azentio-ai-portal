@@ -6,6 +6,7 @@ import { guardEmployee } from "@/lib/auth/pages";
 import { dbAuditSink } from "@/lib/audit/log";
 import { getDb } from "@/lib/db";
 import { listOpenReports, listQueue } from "@/lib/learning/moderation";
+import { listReportedComments } from "@/lib/client/collab";
 
 export const metadata = { title: "Moderation | azentio.ai" };
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function ModerationPage() {
   const audit = dbAuditSink(db);
   const queue = await listQueue(db, g.session.principal, audit);
   const reports = await listOpenReports(db, g.session.principal, audit);
+  const commentReports = (await listReportedComments(db, g.session.principal, audit)).filter((c) => c.status === "visible");
 
   return (
     <EmployeeShell session={g.session} active="moderation" title="Review queue" lead="Only contributions their authors submitted for review appear here. Drafts and organisation-only items are out of reach, and opening a source is audited.">
@@ -51,6 +53,20 @@ export default async function ModerationPage() {
                 <Link href={`/employee/moderation/${r.contributionId}`} className="rounded-full bg-[var(--az-cta-dark)] px-5 py-2 text-sm font-semibold text-white hover:bg-card">Review and decide</Link>
                 <JsonAction url={`/api/moderation/reports/${r.reportId}/dismiss`} body={{ reason: "Reviewed: no action needed." }} label="Dismiss" />
               </div>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-12">
+        <h2 className="text-lg font-semibold text-ink">Reported comments</h2>
+        <p className="text-sm text-muted">Comments on client content, reported by members of that client. You see the reason, never who reported it.</p>
+        <div className="mt-3 space-y-3">
+          {commentReports.length === 0 ? <Empty>No reported comments.</Empty> : commentReports.map((c) => (
+            <Card key={`${c.commentId}-${c.reportedAt.toISOString()}`}>
+              <p className="text-sm text-ink">&ldquo;{c.body}&rdquo;</p>
+              <p className="mt-1 text-xs text-muted">Reported: {c.reason}</p>
+              <div className="mt-3"><JsonAction url={`/api/comments/${c.commentId}`} method="DELETE" label="Hide comment" /></div>
             </Card>
           ))}
         </div>

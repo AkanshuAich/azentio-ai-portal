@@ -8,6 +8,7 @@ import type { Principal } from "@/lib/authz/types";
 import { NotFoundError } from "@/lib/employee/service";
 import { RESOURCE_TYPES, loadResource, type ResourceType } from "@/lib/resources";
 import { requireClientTenant, clientTenantOf } from "./service";
+import { withTenant } from "@/lib/db/tenant";
 
 const refuse = (reason: string) => new ForbiddenError({ allow: false, reason });
 const resourceType = z.enum(RESOURCE_TYPES);
@@ -156,10 +157,10 @@ export async function createSupportRequest(db: Db, principal: Principal, audit: 
 export async function listSupportRequests(db: Db, principal: Principal) {
   const orgId = clientTenantOf(principal);
   if (!orgId) return [];
-  return db
+  return withTenant(db, orgId, (q) => q
     .select({ id: supportRequests.id, subject: supportRequests.subject, status: supportRequests.status, createdAt: supportRequests.createdAt, author: users.displayName })
     .from(supportRequests)
     .innerJoin(users, eq(users.id, supportRequests.userId))
     .where(eq(supportRequests.orgId, orgId))
-    .orderBy(desc(supportRequests.createdAt));
+    .orderBy(desc(supportRequests.createdAt)));
 }

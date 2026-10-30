@@ -1036,3 +1036,31 @@ describe("§10 the brief's illustrative scenario, end to end", () => {
     expect((await db.select().from(s.moderationActions).where(and(eq(s.moderationActions.contributionId, ids[1]), eq(s.moderationActions.action, "request_clarification"))))[0].privateNotes).toContain("PRIVATE");
   });
 });
+
+describe("moderators are told something is waiting, without any content", () => {
+  it("notifies every current holder of the moderation grant on submit, amend and material edit, and nobody else", async () => {
+    const a = await author();
+    const mod = await moderator();
+    const bystander = await employeePrincipal(db);
+    const publisher = await employeePrincipal(db, ["media.publish"]);
+    const unique = `Zebraquartz${uniq()}`;
+    const { id } = await createDraft(db, a.principal, sink(), fields({ title: `About ${unique}` }), CONSENT);
+    await submitContribution(db, a.principal, sink(), id);
+
+    const mine = (await listNotifications(db, mod.user.id)).filter((n) => /waiting for review/.test(n.message));
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine[0].href).toBe("/employee/moderation");
+    expect(mine.map((n) => n.message).join(" ")).not.toContain(unique); // no title, no organisation, no content
+    expect(mine.map((n) => n.message).join(" ")).not.toContain(a.principal.activeOrgId!);
+    for (const other of [bystander, publisher]) expect((await listNotifications(db, other.user.id)).some((n) => /waiting for review/.test(n.message))).toBe(false);
+    expect((await listNotifications(db, a.user.id)).some((n) => /waiting for review/.test(n.message))).toBe(false);
+  });
+
+  it("an expired moderation grant no longer receives them", async () => {
+    const a = await author();
+    const lapsed = await employeePrincipal(db);
+    await db.insert(s.platformGrants).values({ userId: lapsed.user.id, permission: "learning.moderate", expiresAt: new Date(Date.now() - 1000) });
+    await proposed(a);
+    expect((await listNotifications(db, lapsed.user.id)).some((n) => /waiting for review/.test(n.message))).toBe(false);
+  });
+});

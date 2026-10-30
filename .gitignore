@@ -43,3 +43,6 @@ next-env.d.ts
 
 # private object storage (never committed or served statically)
 /storage
+/storage-e2e
+/test-results
+/playwright-report
