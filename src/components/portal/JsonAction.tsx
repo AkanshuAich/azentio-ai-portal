@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 /** A small button or select that sends one request and refreshes. The server decides whether it is allowed. */
 export function JsonAction({
   url, method = "POST", body, label, tone = "outline",
-}: { url: string; method?: "POST" | "PATCH"; body: unknown; label: string; tone?: "outline" | "solid" }) {
+}: { url: string; method?: "POST" | "PATCH" | "DELETE"; body?: unknown; label: string; tone?: "outline" | "solid" }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -14,7 +14,7 @@ export function JsonAction({
   async function run() {
     setBusy(true);
     setError(false);
-    const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
     setBusy(false);
     if (!res.ok) return setError(true);
     router.refresh();

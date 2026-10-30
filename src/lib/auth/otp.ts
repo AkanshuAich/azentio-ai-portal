@@ -33,7 +33,7 @@ async function isEligible(db: Db, email: string, now: Date): Promise<boolean> {
   const [inv] = await db
     .select({ id: invitations.id })
     .from(invitations)
-    .where(and(eq(invitations.email, email), isNull(invitations.consumedAt), gt(invitations.expiresAt, now)));
+    .where(and(eq(invitations.email, email), isNull(invitations.consumedAt), isNull(invitations.revokedAt), gt(invitations.expiresAt, now)));
   return Boolean(inv);
 }
 

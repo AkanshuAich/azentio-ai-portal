@@ -57,3 +57,47 @@ export async function seedEmployeeContent(db: Db, u: { priya: Person; omar: Pers
 
   await db.insert(s.siteBanners).values({ message: "Hackathon registration is open", href: "/hackathon/register", active: false, audience: "public", updatedBy: u.lena.id });
 }
+
+/** Client portal demo content. Each item is addressed to one tenant or to one product's entitled clients. */
+export async function seedClientContent(
+  db: Db,
+  o: { meridian: Person; nusantara: Person; amira: Person; tariq: Person },
+) {
+  await putObject("seed/entitled-demo.svg", slate("Credit strategy walkthrough", "approved demonstration (entitled clients)"));
+  await putObject("seed/meridian-briefing.svg", slate("Meridian Q4 briefing", "client briefing for one organisation"));
+
+  const [demo, briefing] = await db
+    .insert(s.mediaAssets)
+    .values([
+      { title: "Credit strategy walkthrough (approved demo)", kind: "video", storageKey: "seed/entitled-demo.svg", contentType: "image/svg+xml", byteSize: 700, audience: "entitled", productSlug: "credit-strategy-simulator" },
+      { title: "Meridian Q4 client briefing", kind: "document", storageKey: "seed/meridian-briefing.svg", contentType: "image/svg+xml", byteSize: 700, audience: "tenant", ownerOrgId: o.meridian.id },
+    ])
+    .returning();
+
+  const day = 86_400_000;
+  await db.insert(s.liveSessions).values([
+    { title: "Meridian roadmap webinar (invitation only)", startsAt: new Date(Date.now() + 5 * day), streamRef: "https://stream.example.com/meridian-roadmap", audience: "tenant", ownerOrgId: o.meridian.id },
+    { title: "Nusantara onboarding session", startsAt: new Date(Date.now() + 2 * day), streamRef: "https://stream.example.com/nusantara-onboarding", audience: "tenant", ownerOrgId: o.nusantara.id },
+  ]);
+
+  const [note] = await db
+    .insert(s.releaseNotes)
+    .values([
+      { title: "Release notes for Meridian: sandbox update", body: "The Credit Strategy Simulator sandbox now explains its baseline. Applies to Meridian only.", audience: "tenant", ownerOrgId: o.meridian.id, version: 3 },
+      { title: "Release notes for Nusantara: new scenario", body: "A seasonality scenario is now available in your Financial Analysis sandbox.", audience: "tenant", ownerOrgId: o.nusantara.id, version: 3 },
+    ])
+    .returning();
+
+  await db.insert(s.comments).values([
+    { parentType: "media", parentId: briefing.id, orgId: o.meridian.id, authorId: o.amira.id, body: "Thanks. We'll review this with the credit committee." },
+    { parentType: "media", parentId: demo.id, orgId: o.meridian.id, authorId: o.tariq.id, body: "Could the walkthrough show a different cutoff?" },
+  ]);
+  void note;
+
+  await db.insert(s.notifications).values([
+    { userId: o.tariq.id, message: "Your contribution 'Seasonal SME cash flow read as deterioration' was approved and published.", href: "/workspace/dashboard" },
+    { userId: o.tariq.id, message: "A new briefing was shared with Meridian Commercial Bank.", href: "/workspace/resources" },
+  ]);
+
+  await db.insert(s.supportRequests).values({ orgId: o.meridian.id, userId: o.amira.id, subject: "Request to enable the SME workbench sandbox", body: "We would like our credit analysts to try the SME Credit Decisioning Workbench sandbox.", status: "recorded" });
+}

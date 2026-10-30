@@ -3,6 +3,7 @@ import { getSession } from "./http";
 import { can } from "@/lib/authz/policy";
 import type { Permission } from "@/lib/authz/types";
 import type { SessionContext } from "./session";
+import { landingFor } from "./landing";
 
 export function Denied({ title, text }: { title: string; text: string }) {
   return (
@@ -33,4 +34,20 @@ export async function guardEmployee(
     return { denied: <Denied title="You don't have access to this" text={`This needs the ${grant} grant, which is separate from being an employee. Ask a portal administrator if you need it.`} /> };
   }
   return { session };
+}
+
+/**
+ * Per-page guard for the client portal. The caller must hold an active client workspace; a signed-in user
+ * who is mid-onboarding or has not chosen a workspace is sent where they belong, and an employee gets a
+ * 403 because employee status confers no access to any client workspace.
+ */
+export async function guardClient(): Promise<{ session: SessionContext; orgId: string } | { denied: React.ReactElement }> {
+  const session = await getSession();
+  if (!session) redirect("/signin");
+  const { activeOrgId, activeRole } = session.principal;
+  if (!activeOrgId) redirect(landingFor(session));
+  if (activeRole !== "client_member" && activeRole !== "client_admin") {
+    return { denied: <Denied title="This area is for client workspaces" text="Employees use the employee portal. Employee status doesn't give access to any client's workspace." /> };
+  }
+  return { session, orgId: activeOrgId };
 }

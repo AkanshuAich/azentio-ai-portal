@@ -108,6 +108,9 @@ export const improvementIdeas = pgTable("improvement_ideas", {
   // The assigned product owner. Assignment grants access only to evidence shared for that purpose.
   ownerUserId: uuid("owner_user_id").references(() => users.id),
   priority: text("priority"),
+  // Clients see an idea only after a product owner deliberately publishes an approved plain-language summary.
+  clientVisible: boolean("client_visible").notNull().default(false),
+  clientSummary: text("client_summary"),
   status: ideaStatus("status").notNull().default("proposed"),
   themeId: uuid("theme_id").references(() => themes.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -117,6 +120,7 @@ export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id),
   message: text("message").notNull(),
+  href: text("href"),
   readAt: timestamp("read_at", { withTimezone: true }),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });

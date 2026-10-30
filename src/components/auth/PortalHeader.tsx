@@ -15,8 +15,8 @@ interface Workspace {
  * every protected page and API still checks the server-side session.
  */
 export function PortalHeader({
-  displayName, activeOrgId, workspaces,
-}: { displayName: string; activeOrgId: string | null; workspaces: Workspace[] }) {
+  displayName, activeOrgId, workspaces, unread,
+}: { displayName: string; activeOrgId: string | null; workspaces: Workspace[]; unread?: number }) {
   const router = useRouter();
   const active = workspaces.find((w) => w.orgId === activeOrgId);
   const switchable = workspaces.filter((w) => w.termsAccepted);
@@ -52,6 +52,11 @@ export function PortalHeader({
             </select>
           ) : (
             <strong className="font-semibold text-mint">{active?.orgName ?? "None"}</strong>
+          )}
+          {unread !== undefined && (
+            <a href="/workspace/notifications" className="relative rounded-full border border-white/20 px-3 py-1.5 hover:border-mint" aria-label={`Notifications, ${unread} unread`}>
+              Notifications{unread > 0 && <span className="ml-2 rounded-full bg-mint px-2 py-0.5 text-xs font-semibold text-ink">{unread}</span>}
+            </a>
           )}
           <span className="text-white/50">{displayName}</span>
           <button onClick={signOut} className="rounded-full border border-white/30 px-4 py-1.5 hover:border-mint">Sign out</button>

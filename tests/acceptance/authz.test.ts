@@ -194,6 +194,15 @@ describe("§03 required access rule: audience matrix", () => {
     expect(can(adminB, "read", res({ audience: "entitled", orgId: MERIDIAN, entitlement: "credit-strategy-simulator" })).allow).toBe(false);
   });
 
+  it("entitled content with no owning tenant: any client workspace holding the entitlement, nobody else", () => {
+    const r = res({ audience: "entitled", entitlement: "credit-strategy-simulator" });
+    expect(can(memberA, "read", r).allow).toBe(true); // entitled
+    expect(can(adminB, "read", r).allow).toBe(false); // client, but not entitled
+    expect(can(emp, "read", r).allow).toBe(false); // employees get no automatic access
+    expect(can(anon, "read", r).allow).toBe(false);
+    expect(can(memberA, "read", res({ audience: "entitled" })).allow).toBe(false); // names no product
+  });
+
   it("shared_community: authorised participants only, not anonymous visitors", () => {
     const r = res({ audience: "shared_community" });
     expect(can(memberA, "read", r).allow).toBe(true);

@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 import { createDb } from "./client";
 import * as s from "./schema";
-import { seedEmployeeContent } from "./seed-employee";
+import { seedClientContent, seedEmployeeContent } from "./seed-employee";
 
 config({ path: ".env.local" });
 
@@ -25,6 +25,7 @@ async function main() {
   await db.execute(sql`TRUNCATE TABLE
     search_documents, outbox_messages, notifications, improvement_ideas, theme_evidence, themes,
     consents, contribution_reports, moderation_actions, shared_publications, contributions,
+    bookmarks, comment_reports, comments, saved_scenarios, support_requests,
     audit_events, demo_enquiries, hackathon_registrations, login_challenges, employee_allowlist, entitlements, sessions, invitations, platform_grants, memberships, users, organizations,
     release_notes, knowledge_feedback, knowledge_articles, hackathon_team_members, hackathon_teams, experiments,
     playground_runs, site_banners, live_sessions, media_assets, products
@@ -171,6 +172,8 @@ async function main() {
 
   await db.insert(s.improvementIdeas).values({
     ownerUserId: ravi.id,
+    clientVisible: true,
+    clientSummary: "We are looking at explaining period-over-period changes against a seasonal baseline. This is under review and is not a commitment to deliver.",
     title: "Seasonality-aware comparison explanation",
     problem: "Analysis compares periods without seasonal context, so seasonal borrowers look weaker off-season.",
     offering: "financial-analysis-intelligence",
@@ -182,6 +185,7 @@ async function main() {
   });
 
   await seedEmployeeContent(db, { priya, omar, lena, ravi });
+  await seedClientContent(db, { meridian, nusantara, amira, tariq });
 
   console.log("Seeded: 5 organisations, 12 users, 8 products, 9 contributions, 2 themes, 1 idea.");
   process.exit(0);

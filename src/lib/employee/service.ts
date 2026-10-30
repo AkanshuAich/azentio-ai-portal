@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/lib/db/client";
 import {
   experiments, hackathonTeamMembers, hackathonTeams, knowledgeArticles, knowledgeFeedback, liveSessions,
-  mediaAssets, playgroundRuns, releaseNotes, siteBanners, users,
+  mediaAssets, organizations, playgroundRuns, products, releaseNotes, siteBanners, users,
 } from "@/lib/db/schema";
 import { requirePermission, type AuditSink } from "@/lib/authz/guard";
 import { can } from "@/lib/authz/policy";
@@ -45,7 +45,7 @@ export async function saveRunFeedback(db: Db, principal: Principal, audit: Audit
   const updated = await db
     .update(playgroundRuns)
     .set({ feedback })
-    .where(and(eq(playgroundRuns.id, runId), eq(playgroundRuns.userId, principal.userId)))
+    .where(and(eq(playgroundRuns.id, runId), eq(playgroundRuns.userId, principal.userId), isNull(playgroundRuns.orgId)))
     .returning({ id: playgroundRuns.id });
   if (updated.length === 0) throw new NotFoundError();
 }
@@ -55,7 +55,7 @@ export async function listMyRuns(db: Db, principal: Principal, limit = 8) {
   return db
     .select({ id: playgroundRuns.id, scenarioId: playgroundRuns.scenarioId, createdAt: playgroundRuns.createdAt, feedback: playgroundRuns.feedback })
     .from(playgroundRuns)
-    .where(eq(playgroundRuns.userId, principal.userId))
+    .where(and(eq(playgroundRuns.userId, principal.userId), isNull(playgroundRuns.orgId)))
     .orderBy(desc(playgroundRuns.createdAt))
     .limit(limit);
 }
@@ -229,10 +229,36 @@ export async function getLiveSession(db: Db, principal: Principal | null, id: st
   return liveVisible(principal, row) ? row : "forbidden";
 }
 
-export const releaseNoteSchema = z.object({
-  title: z.string().trim().min(4).max(140),
-  body: z.string().trim().min(10).max(4000),
-});
+// A publisher chooses who sees a piece of content. Tenant audiences name ONE client organisation and
+// entitled audiences name ONE product; combinations that don't make sense are rejected up front.
+const audienceTarget = {
+  orgId: z.string().uuid().optional(),
+  productSlug: z.string().trim().max(80).optional(),
+};
+
+function requireTarget(v: { audience: string; orgId?: string; productSlug?: string }, ctx: z.RefinementCtx) {
+  if (v.audience === "tenant" && !v.orgId) ctx.addIssue({ code: "custom", path: ["orgId"], message: "Choose the client organisation" });
+  if (v.audience === "entitled" && !v.productSlug) ctx.addIssue({ code: "custom", path: ["productSlug"], message: "Choose the product" });
+}
+
+async function assertClientOrg(db: Db, orgId: string) {
+  const [o] = await db.select({ kind: organizations.kind }).from(organizations).where(eq(organizations.id, orgId));
+  if (!o || o.kind !== "client") throw new NotFoundError();
+}
+
+async function assertProduct(db: Db, slug: string) {
+  const [p] = await db.select({ id: products.id }).from(products).where(eq(products.slug, slug));
+  if (!p) throw new NotFoundError();
+}
+
+export const releaseNoteSchema = z
+  .object({
+    title: z.string().trim().min(4).max(140),
+    body: z.string().trim().min(10).max(4000),
+    audience: z.enum(["employee", "public", "tenant"]).default("employee"),
+    orgId: audienceTarget.orgId,
+  })
+  .superRefine(requireTarget);
 
 export async function listReleaseNotes(db: Db, principal: Principal) {
   const rows = await db.select().from(releaseNotes).orderBy(desc(releaseNotes.version), asc(releaseNotes.title));
@@ -243,40 +269,53 @@ export async function listReleaseNotes(db: Db, principal: Principal) {
 export async function createReleaseNote(db: Db, principal: Principal, audit: AuditSink, raw: unknown) {
   await requirePermission({ ...guard(principal, audit), subjectType: "release_note" }, "publish_media", EMPLOYEE);
   const input = releaseNoteSchema.parse(raw);
-  const [row] = await db.insert(releaseNotes).values({ ...input, audience: "employee" }).returning({ id: releaseNotes.id });
+  if (input.audience === "tenant") await assertClientOrg(db, input.orgId!);
+  const [row] = await db
+    .insert(releaseNotes)
+    .values({ title: input.title, body: input.body, audience: input.audience, ownerOrgId: input.audience === "tenant" ? input.orgId! : null })
+    .returning({ id: releaseNotes.id });
   return row.id;
 }
 
 // ---------------------------------------------------------------- publishing console
 
-// Console audiences are limited to these two; tenant-scoped audiences arrive with the client portal.
-export const PUBLISH_AUDIENCES = ["employee", "public"] as const;
+export const PUBLISH_AUDIENCES = ["employee", "public", "tenant", "entitled"] as const;
 
-export const liveSessionSchema = z.object({
-  title: z.string().trim().min(4).max(140),
-  startsAt: z.string().datetime().optional(),
-  // https only: zod's url() would also accept javascript: and data: schemes, which must never reach a link.
-  streamRef: z.string().trim().max(500).refine((v) => /^https:\/\/[^\s]+$/i.test(v), "Stream link must be an https URL")
-    .optional().or(z.literal("").transform(() => undefined)),
-  audience: z.enum(PUBLISH_AUDIENCES),
-});
+export const liveSessionSchema = z
+  .object({
+    title: z.string().trim().min(4).max(140),
+    startsAt: z.string().datetime().optional(),
+    // https only: zod's url() would also accept javascript: and data: schemes, which must never reach a link.
+    streamRef: z.string().trim().max(500).refine((v) => /^https:\/\/[^\s]+$/i.test(v), "Stream link must be an https URL")
+      .optional().or(z.literal("").transform(() => undefined)),
+    audience: z.enum(["employee", "public", "tenant"]),
+    orgId: audienceTarget.orgId,
+  })
+  .superRefine(requireTarget);
 
 export async function createLiveSession(db: Db, principal: Principal, audit: AuditSink, raw: unknown) {
   await requirePermission({ ...guard(principal, audit), subjectType: "live_session" }, "publish_media", EMPLOYEE);
   const input = liveSessionSchema.parse(raw);
+  if (input.audience === "tenant") await assertClientOrg(db, input.orgId!);
   const [row] = await db
     .insert(liveSessions)
-    .values({ title: input.title, startsAt: input.startsAt ? new Date(input.startsAt) : null, streamRef: input.streamRef ?? null, audience: input.audience })
+    .values({
+      title: input.title, startsAt: input.startsAt ? new Date(input.startsAt) : null, streamRef: input.streamRef ?? null,
+      audience: input.audience, ownerOrgId: input.audience === "tenant" ? input.orgId! : null,
+    })
     .returning({ id: liveSessions.id });
   return row.id;
 }
 
-export const mediaMetaSchema = z.object({
-  title: z.string().trim().min(2).max(140),
-  kind: z.enum(["video", "recording", "image", "document"]),
-  audience: z.enum(PUBLISH_AUDIENCES),
-  liveSessionId: z.string().uuid().optional(),
-});
+export const mediaMetaSchema = z
+  .object({
+    title: z.string().trim().min(2).max(140),
+    kind: z.enum(["video", "recording", "image", "document"]),
+    audience: z.enum(PUBLISH_AUDIENCES),
+    liveSessionId: z.string().uuid().optional(),
+    ...audienceTarget,
+  })
+  .superRefine(requireTarget);
 
 /** Stores an uploaded file in private storage. The type is verified from the bytes, not the filename. */
 export async function uploadMedia(
@@ -286,12 +325,19 @@ export async function uploadMedia(
   const input = mediaMetaSchema.parse(meta);
   const check = checkUpload(declaredType, bytes);
   if (!check.ok) throw new UploadRejected(check.reason);
+  if (input.audience === "tenant") await assertClientOrg(db, input.orgId!);
+  if (input.audience === "entitled") await assertProduct(db, input.productSlug!);
 
   const key = newStorageKey(check.ext);
   await putObject(key, bytes);
   const [row] = await db
     .insert(mediaAssets)
-    .values({ title: input.title, kind: input.kind, storageKey: key, contentType: declaredType, byteSize: bytes.length, audience: input.audience })
+    .values({
+      title: input.title, kind: input.kind, storageKey: key, contentType: declaredType, byteSize: bytes.length,
+      audience: input.audience,
+      ownerOrgId: input.audience === "tenant" ? input.orgId! : null,
+      productSlug: input.audience === "entitled" ? input.productSlug! : null,
+    })
     .returning({ id: mediaAssets.id });
 
   if (input.liveSessionId) {
@@ -307,11 +353,28 @@ export class UploadRejected extends Error {
   }
 }
 
-/** Changing who can see a recording is audited. Widening to public is the consequential direction. */
-export async function setMediaAudience(db: Db, principal: Principal, audit: AuditSink, id: string, audience: unknown) {
+const audienceChange = z
+  .object({ audience: z.enum(PUBLISH_AUDIENCES), ...audienceTarget })
+  .superRefine(requireTarget);
+
+/** Changing who can see a piece of media is audited. Widening it is the consequential direction. */
+export async function setMediaAudience(
+  db: Db, principal: Principal, audit: AuditSink, id: string, audience: unknown,
+  target: { orgId?: string; productSlug?: string } = {},
+) {
   await requirePermission({ ...guard(principal, audit), subjectType: "media_asset", subjectId: id }, "publish_media", EMPLOYEE);
-  const next = z.enum(PUBLISH_AUDIENCES).parse(audience);
-  const updated = await db.update(mediaAssets).set({ audience: next }).where(eq(mediaAssets.id, id)).returning({ id: mediaAssets.id });
+  const next = audienceChange.parse({ audience, ...target });
+  if (next.audience === "tenant") await assertClientOrg(db, next.orgId!);
+  if (next.audience === "entitled") await assertProduct(db, next.productSlug!);
+  const updated = await db
+    .update(mediaAssets)
+    .set({
+      audience: next.audience,
+      ownerOrgId: next.audience === "tenant" ? next.orgId! : null,
+      productSlug: next.audience === "entitled" ? next.productSlug! : null,
+    })
+    .where(eq(mediaAssets.id, id))
+    .returning({ id: mediaAssets.id });
   if (updated.length === 0) throw new NotFoundError();
 }
 

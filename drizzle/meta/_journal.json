@@ -29,6 +29,20 @@
       "when": 1793371449194,
       "tag": "0003_fantastic_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793372192399,
+      "tag": "0004_lowly_crystal",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793372245632,
+      "tag": "0005_glorious_vulture",
+      "breakpoints": true
     }
   ]
 }

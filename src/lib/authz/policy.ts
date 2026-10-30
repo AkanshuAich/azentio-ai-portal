@@ -53,7 +53,10 @@ function audiencePermits(p: Principal | null, r: Resource): Decision {
         ? allow("owner of private record")
         : deny("private to its author");
     case "entitled":
-      if (!tenantMatches(p, r)) return deny("tenant mismatch");
+      // Entitled content is shared by product, so it has no owning tenant. The caller needs a valid client
+      // workspace and the entitlement; if the record does name a tenant, it must be the active one.
+      if (!p.activeOrgId || !isClientRole(p)) return deny("no active client workspace");
+      if (r.orgId && r.orgId !== p.activeOrgId) return deny("tenant mismatch");
       if (!r.entitlement) return deny("entitled resource names no product");
       return p.entitlements.has(r.entitlement)
         ? allow("tenant is entitled")

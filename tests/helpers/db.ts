@@ -95,3 +95,20 @@ export async function clientPrincipal(db: Db, orgId: string, role: "client_membe
   const ctx = (await loadSession(db, (await createSession(db, u.id)).token))!;
   return { user: u, principal: ctx.principal };
 }
+
+import { switchWorkspace } from "../../src/lib/auth/session";
+
+export async function grantEntitlement(db: Db, orgId: string, productSlug: string) {
+  await db.insert(s.entitlements).values({ orgId, productSlug }).onConflictDoNothing();
+}
+
+export async function ensureProduct(db: Db, slug: string, audience: "public" | "employee" = "public") {
+  await db.insert(s.products).values({ slug, name: slug, category: "Test", summary: `${slug} summary.`, audience }).onConflictDoNothing();
+}
+
+/** A fresh principal for an existing user, with the given workspace explicitly active. */
+export async function principalIn(db: Db, userId: string, orgId: string) {
+  const { token } = await createSession(db, userId);
+  await switchWorkspace(db, token, orgId);
+  return (await loadSession(db, token))!.principal;
+}

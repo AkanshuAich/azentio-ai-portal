@@ -86,6 +86,8 @@ export const invitations = pgTable("invitations", {
   invitedBy: uuid("invited_by").notNull().references(() => users.id),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  // Cancelled by an administrator before it was used.
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

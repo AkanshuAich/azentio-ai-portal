@@ -1,11 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { FieldMeta, ScenarioMeta, ScenarioOutput } from "@/lib/playground/scenarios";
 
 const box = "rounded-az-lg bg-panel p-5 text-ink";
 
-export function PlaygroundClient({ scenarios, initialId }: { scenarios: ScenarioMeta[]; initialId?: string }) {
+export interface SavedItem { id: string; name: string; scenarioId: string; params: Record<string, number>; visibility: string; mine: boolean; author: string }
+
+/**
+ * Guided sandbox UI shared by the employee Playground and the client sandboxes. The mode only chooses
+ * which API to call; the server decides what the caller may run and what is stored where.
+ */
+export function PlaygroundClient({
+  scenarios, initialId, mode = "employee", saved = [],
+}: { scenarios: ScenarioMeta[]; initialId?: string; mode?: "employee" | "client"; saved?: SavedItem[] }) {
+  const router = useRouter();
+  const client = mode === "client";
+  const runUrl = client ? "/api/client/sandbox/run" : "/api/playground/run";
+  const feedbackUrl = (id: string) => (client ? `/api/client/sandbox/runs/${id}/feedback` : `/api/playground/runs/${id}/feedback`);
+  const [saveName, setSaveName] = useState("");
+  const [saveVis, setSaveVis] = useState<"private" | "organisation">("private");
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [scenario, setScenario] = useState<ScenarioMeta | null>(scenarios.find((s) => s.id === initialId) ?? null);
   const [values, setValues] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
@@ -24,13 +40,37 @@ export function PlaygroundClient({ scenarios, initialId }: { scenarios: Scenario
 
   const current = (f: FieldMeta) => values[f.name] ?? f.default;
 
+  function load(item: SavedItem) {
+    const sc = scenarios.find((x) => x.id === item.scenarioId);
+    if (!sc) return;
+    setScenario(sc);
+    setValues(item.params);
+    setResult(null);
+  }
+
+  async function saveCurrent() {
+    if (!scenario) return;
+    setSaveMsg(null);
+    const params = Object.fromEntries(scenario.fields.map((f) => [f.name, current(f)]));
+    const res = await fetch("/api/client/sandbox/saved", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: saveName, scenarioId: scenario.id, params, visibility: saveVis }),
+    });
+    if (res.ok) { setSaveName(""); setSaveMsg("Saved."); router.refresh(); } else setSaveMsg("Couldn't save. Give it a name of 2 to 80 characters.");
+  }
+
+  async function removeSaved(id: string) {
+    await fetch(`/api/client/sandbox/saved/${id}`, { method: "DELETE" });
+    router.refresh();
+  }
+
   async function run() {
     if (!scenario) return;
     setBusy(true);
     setError(null);
     setFbState("idle");
     const params = Object.fromEntries(scenario.fields.map((f) => [f.name, current(f)]));
-    const res = await fetch("/api/playground/run", {
+    const res = await fetch(runUrl, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId: scenario.id, params }),
     });
     setBusy(false);
@@ -40,7 +80,7 @@ export function PlaygroundClient({ scenarios, initialId }: { scenarios: Scenario
 
   async function sendFeedback() {
     if (!result) return;
-    const res = await fetch(`/api/playground/runs/${result.id}/feedback`, {
+    const res = await fetch(feedbackUrl(result.id), {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ helpful: fb.helpful, accuracy: fb.accuracy, comment: fb.comment || undefined }),
     });
@@ -86,6 +126,41 @@ export function PlaygroundClient({ scenarios, initialId }: { scenarios: Scenario
             <span className="text-xs text-muted">Deterministic. No model is called and no real data is used.</span>
           </div>
           {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
+
+          {client && (
+            <div className="mt-6 flex flex-wrap items-end gap-3 rounded-az-lg border border-panel p-4">
+              <div>
+                <label htmlFor="sv-name" className="text-sm font-semibold">Save this scenario</label>
+                <input id="sv-name" value={saveName} maxLength={80} onChange={(e) => setSaveName(e.target.value)} placeholder="Name" className="mt-1 block rounded-az border border-[#c9d3d9] bg-white px-3 py-2" />
+              </div>
+              <div>
+                <label htmlFor="sv-vis" className="text-sm font-semibold">Who can see it</label>
+                <select id="sv-vis" value={saveVis} onChange={(e) => setSaveVis(e.target.value as "private" | "organisation")} className="mt-1 block rounded-az border border-[#c9d3d9] bg-white px-3 py-2">
+                  <option value="private">Only me</option>
+                  <option value="organisation">My organisation</option>
+                </select>
+              </div>
+              <button onClick={saveCurrent} className="rounded-full border border-[#c9d3d9] px-5 py-2 text-sm font-semibold hover:border-green">Save</button>
+              {saveMsg && <span role="status" className="text-sm text-text">{saveMsg}</span>}
+            </div>
+          )}
+        </section>
+      )}
+
+      {client && saved.length > 0 && (
+        <section aria-labelledby="pg-saved">
+          <h2 id="pg-saved" className="text-lg font-semibold text-ink">Saved scenarios</h2>
+          <ul className="mt-3 divide-y divide-panel rounded-az-lg border border-panel">
+            {saved.map((x) => (
+              <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-ink">
+                <span><strong>{x.name}</strong> <span className="text-muted">· {scenarios.find((s) => s.id === x.scenarioId)?.title} · {x.visibility === "organisation" ? `shared by ${x.mine ? "you" : x.author}` : "only you"}</span></span>
+                <span className="flex gap-2">
+                  <button onClick={() => load(x)} className="rounded-full border border-[#c9d3d9] px-3 py-1 hover:border-green">Load</button>
+                  {x.mine && <button onClick={() => removeSaved(x.id)} className="rounded-full border border-[#c9d3d9] px-3 py-1 hover:border-red-400">Delete</button>}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

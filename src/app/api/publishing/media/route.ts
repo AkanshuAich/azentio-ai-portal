@@ -14,6 +14,8 @@ export const POST = authedRoute(async (req, { db, session, audit }) => {
   const meta = {
     title: form.get("title"), kind: form.get("kind"), audience: form.get("audience"),
     liveSessionId: form.get("liveSessionId") || undefined,
+    orgId: form.get("orgId") || undefined,
+    productSlug: form.get("productSlug") || undefined,
   };
   const id = await uploadMedia(db, session.principal, audit, meta, file.type, new Uint8Array(await file.arrayBuffer()));
   return NextResponse.json({ ok: true, id }, { status: 201 });

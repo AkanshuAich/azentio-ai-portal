@@ -5,12 +5,13 @@ import { JsonForm } from "@/components/portal/JsonForm";
 import { UploadForm } from "@/components/portal/UploadForm";
 import { guardEmployee } from "@/lib/auth/pages";
 import { getDb } from "@/lib/db";
-import { liveSessions, mediaAssets, siteBanners } from "@/lib/db/schema";
+import { liveSessions, mediaAssets, organizations, products, siteBanners } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export const metadata = { title: "Publishing | azentio.ai" };
 export const dynamic = "force-dynamic";
 
-const AUD = { employee: "Employees only", public: "Public" } as Record<string, string>;
+const AUD = { employee: "Employees only", public: "Public", tenant: "One client", entitled: "Entitled clients" } as Record<string, string>;
 
 export default async function PublishingPage() {
   // Needs the media.publish grant on top of being an employee (IAM-02).
@@ -20,6 +21,9 @@ export default async function PublishingPage() {
   const [banner] = await db.select().from(siteBanners).limit(1);
   const sessions = await db.select().from(liveSessions).orderBy(desc(liveSessions.startsAt));
   const assets = await db.select().from(mediaAssets).orderBy(desc(mediaAssets.createdAt));
+  const clientOrgs = await db.select({ id: organizations.id, name: organizations.name }).from(organizations).where(eq(organizations.kind, "client")).orderBy(organizations.name);
+  const productList = await db.select({ slug: products.slug, name: products.name }).from(products).orderBy(products.name);
+  const orgName = new Map(clientOrgs.map((o) => [o.id, o.name]));
 
   return (
     <EmployeeShell session={g.session} active="publishing" title="Your publishing workspace." lead="Manage the homepage banner, live sessions and recordings. Every change here is audited.">
@@ -41,13 +45,14 @@ export default async function PublishingPage() {
             { name: "title", label: "Title", required: true, maxLength: 140 },
             { name: "startsAt", label: "Starts at", type: "datetime-local" },
             { name: "streamRef", label: "Stream link (https)", type: "url", maxLength: 500 },
-            { name: "audience", label: "Audience", type: "select", defaultValue: "employee", options: [{ value: "employee", label: "Employees only" }, { value: "public", label: "Public" }] },
+            { name: "audience", label: "Audience", type: "select", defaultValue: "employee", options: [{ value: "employee", label: "Employees only" }, { value: "public", label: "Public" }, { value: "tenant", label: "One client organisation (webinar or briefing)" }] },
+            { name: "orgId", label: "Client organisation (for the option above)", type: "select", defaultValue: "", options: [{ value: "", label: "—" }, ...clientOrgs.map((o) => ({ value: o.id, label: o.name }))] },
           ]} />
         </Card>
 
         <Card>
           <h2 className="mb-4 text-lg font-semibold">Upload media or a recording</h2>
-          <UploadForm sessions={sessions.map((s) => ({ id: s.id, title: s.title }))} />
+          <UploadForm sessions={sessions.map((s) => ({ id: s.id, title: s.title }))} orgs={clientOrgs} products={productList} />
         </Card>
 
         <section>
@@ -61,11 +66,11 @@ export default async function PublishingPage() {
                     <p className="text-xs text-muted">{a.kind} · {a.contentType} · {(a.byteSize / 1024).toFixed(0)} KB</p>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${a.audience === "public" ? "bg-amber-100 text-amber-900" : "bg-white"}`}>{AUD[a.audience] ?? a.audience}</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${a.audience === "public" ? "bg-amber-100 text-amber-900" : "bg-white"}`}>{AUD[a.audience] ?? a.audience}{a.audience === "tenant" && a.ownerOrgId ? `: ${orgName.get(a.ownerOrgId) ?? "?"}` : a.audience === "entitled" ? `: ${a.productSlug}` : ""}</span>
                     <JsonAction
                       url={`/api/publishing/media/${a.id}`} method="PATCH"
-                      body={{ audience: a.audience === "public" ? "employee" : "public" }}
-                      label={a.audience === "public" ? "Make employees-only" : "Make public"}
+                      body={{ audience: a.audience === "employee" ? "public" : "employee" }}
+                      label={a.audience === "public" ? "Make employees-only" : a.audience === "employee" ? "Make public" : "Make employees-only"}
                     />
                   </div>
                 </div>

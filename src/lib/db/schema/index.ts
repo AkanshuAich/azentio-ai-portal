@@ -4,3 +4,4 @@ export * from "./content";
 export * from "./learning";
 export * from "./public";
 export * from "./employee";
+export * from "./client";

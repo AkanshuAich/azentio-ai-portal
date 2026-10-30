@@ -15,7 +15,7 @@ npm test            # policy engine + acceptance tests
 npm run typecheck
 ```
 
-Status: Phases 0-3 complete.
+Status: Phases 0-4 complete.
 - Phase 0: schema, design tokens, authz policy engine, audit sink, seed.
 - Phase 1: email-code sign-in, organiser-approved employee provisioning, single-use invitations,
   terms step, active-workspace switcher, CSRF origin checks.
@@ -24,7 +24,10 @@ Status: Phases 0-3 complete.
 - Phase 3: employee portal (dashboard, guided Playground on synthetic scenarios, internal live sessions and
   recordings, experiments, hackathon spaces, knowledge library, release notes), publishing console behind the
   separate media.publish grant, private storage with a gated /api/media route.
-Not yet built: client portal, learning workflow, signed-in AIRA.
+- Phase 4: client portal (organisation dashboard with empty states, entitled sandboxes with tenant- and
+  user-isolated runs and saved scenarios, member and invitation administration, resources, bookmarks, comments
+  that inherit their parent audience with reporting and moderation, in-app notifications, support requests).
+Not yet built: contribution workflow (observations, moderation, shared feed, themes), signed-in AIRA.
 
 Local notes
 - Uploaded media lives in ./storage (gitignored) and is only served through /api/media/[id].

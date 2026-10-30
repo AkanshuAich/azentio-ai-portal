@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 const input = "mt-1 w-full rounded-az border border-[#c9d3d9] bg-white px-3 py-2 text-ink focus:border-green";
 
-export function UploadForm({ sessions }: { sessions: { id: string; title: string }[] }) {
+export function UploadForm({ sessions, orgs, products }: { sessions: { id: string; title: string }[]; orgs: { id: string; name: string }[]; products: { slug: string; name: string }[] }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -44,6 +44,23 @@ export function UploadForm({ sessions }: { sessions: { id: string; title: string
           <label htmlFor="up-aud" className="text-sm font-semibold">Audience</label>
           <select id="up-aud" name="audience" defaultValue="employee" className={input}>
             <option value="employee">Employees only</option><option value="public">Public</option>
+            <option value="tenant">One client organisation</option><option value="entitled">Clients entitled to a product</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="up-org" className="text-sm font-semibold">Client organisation</label>
+          <select id="up-org" name="orgId" defaultValue="" className={input}>
+            <option value="">(only for One client organisation)</option>
+            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="up-product" className="text-sm font-semibold">Product</label>
+          <select id="up-product" name="productSlug" defaultValue="" className={input}>
+            <option value="">(only for Clients entitled to a product)</option>
+            {products.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
           </select>
         </div>
       </div>

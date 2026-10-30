@@ -75,7 +75,7 @@ export async function describeInvitation(db: Db, token: string, now = new Date()
     .select({ orgName: organizations.name, role: invitations.proposedRole })
     .from(invitations)
     .innerJoin(organizations, eq(organizations.id, invitations.orgId))
-    .where(and(eq(invitations.tokenHash, sha256(token)), isNull(invitations.consumedAt), gt(invitations.expiresAt, now)));
+    .where(and(eq(invitations.tokenHash, sha256(token)), isNull(invitations.consumedAt), isNull(invitations.revokedAt), gt(invitations.expiresAt, now)));
   return row ?? null;
 }
 
@@ -95,7 +95,7 @@ export async function acceptInvitation(
 
   // One generic failure for every reason, so the response never says which condition failed.
   const ok =
-    inv && user && !inv.consumedAt && inv.expiresAt > now &&
+    inv && user && !inv.consumedAt && !inv.revokedAt && inv.expiresAt > now &&
     user.emailVerifiedAt !== null && user.email === inv.email;
   if (!ok) {
     await audit({
@@ -109,7 +109,7 @@ export async function acceptInvitation(
     const consumed = await tx
       .update(invitations)
       .set({ consumedAt: now })
-      .where(and(eq(invitations.id, inv.id), isNull(invitations.consumedAt)))
+      .where(and(eq(invitations.id, inv.id), isNull(invitations.consumedAt), isNull(invitations.revokedAt)))
       .returning({ id: invitations.id });
     if (consumed.length === 0) throw new InvitationError("invalid_invitation");
 
