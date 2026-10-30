@@ -1,0 +1,1 @@
+ALTER TABLE "contributions" ADD COLUMN "org_shared_at" timestamp with time zone;

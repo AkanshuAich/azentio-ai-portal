@@ -15,7 +15,7 @@ npm test            # policy engine + acceptance tests
 npm run typecheck
 ```
 
-Status: Phases 0-4 complete.
+Status: Phases 0-5 complete.
 - Phase 0: schema, design tokens, authz policy engine, audit sink, seed.
 - Phase 1: email-code sign-in, organiser-approved employee provisioning, single-use invitations,
   terms step, active-workspace switcher, CSRF origin checks.
@@ -27,9 +27,15 @@ Status: Phases 0-4 complete.
 - Phase 4: client portal (organisation dashboard with empty states, entitled sandboxes with tenant- and
   user-isolated runs and saved scenarios, member and invitation administration, resources, bookmarks, comments
   that inherit their parent audience with reporting and moderation, in-app notifications, support requests).
-Not yet built: contribution workflow (observations, moderation, shared feed, themes), signed-in AIRA.
+- Phase 5: collective-learning workflow (private drafts, four separate consents, submit/return/amend/withdraw,
+  moderation with redaction, publish/unpublish/restore, reports, synchronous withdrawal fan-out), shared feed with
+  search/filters/saved searches/export, themes with distinct-organisation suppression, improvement ideas with audited
+  status, and signed-in AIRA (Claude with a deterministic fallback).
+Not yet built: documentation set, Playwright journeys, Postgres row-level security, route-coverage test.
 
 Local notes
+- AIRA uses Claude when ANTHROPIC_API_KEY is set (model claude-opus-5-5, override with AIRA_MODEL) and otherwise a
+  deterministic retrieval summary. It has not been exercised against the live API in this build.
 - Uploaded media lives in ./storage (gitignored) and is only served through /api/media/[id].
 - Postgres runs on host port 5433 (5432 is often taken by a local install).
 - No email provider is wired in: sign-in codes and invitation links land in the outbox and are shown at

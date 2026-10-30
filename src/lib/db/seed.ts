@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { createDb } from "./client";
 import * as s from "./schema";
 import { seedClientContent, seedEmployeeContent } from "./seed-employee";
+import { indexPublication } from "../learning/indexing";
 
 config({ path: ".env.local" });
 
@@ -25,6 +26,7 @@ async function main() {
   await db.execute(sql`TRUNCATE TABLE
     search_documents, outbox_messages, notifications, improvement_ideas, theme_evidence, themes,
     consents, contribution_reports, moderation_actions, shared_publications, contributions,
+    review_drafts, contribution_events, idea_evidence, publication_feedback, saved_searches, aira_chunks, app_state,
     bookmarks, comment_reports, comments, saved_scenarios, support_requests,
     audit_events, demo_enquiries, hackathon_registrations, login_challenges, employee_allowlist, entitlements, sessions, invitations, platform_grants, memberships, users, organizations,
     release_notes, knowledge_feedback, knowledge_articles, hackathon_team_members, hackathon_teams, experiments,
@@ -105,7 +107,7 @@ async function main() {
   ]);
 
   // --- The brief's illustrative scenario: seasonal SME cash flow, three organisations. ---
-  const base = { kind: "market_observation", offering: "financial-analysis-intelligence", evidenceType: "client_experience", confidence: "medium" } as const;
+  const base = { kind: "market_observation", offering: "financial-analysis-intelligence", evidenceType: "client_experience", confidence: "medium", submittedAt: new Date(Date.now() - 6 * 86_400_000) } as const;
   const [cM, cN, cA, , , , cRejected, cZ1, cZ2] = await db
     .insert(s.contributions)
     .values([
@@ -113,7 +115,7 @@ async function main() {
       { ...base, orgId: nusantara.id, authorId: budi.id, title: "Harvest-cycle borrowers look volatile in quarterly analysis", body: "Borrowers tied to harvest cycles show lumpy receipts. Quarter-on-quarter comparisons overstate volatility and trigger unnecessary reviews.", industry: "Lending", region: "South East Asia", observationPeriod: "2026-H1", sharingChoice: "propose_shared", status: "published" },
       { ...base, orgId: atlas.id, authorId: john.id, title: "Seasonal demand swings distort working-capital metrics", body: "Distributors with seasonal demand show working-capital ratios that swing sharply and are hard to explain to credit teams without a seasonality-aware comparison.", industry: "ERP", region: "UAE", observationPeriod: "2026-H1", sharingChoice: "propose_shared", status: "published" },
       // Other lifecycle states, so every screen has realistic data.
-      { ...base, orgId: meridian.id, authorId: tariq.id, kind: "improvement_suggestion", title: "Draft: explain covenant breaches in plain language", body: "Early notes, not ready to share.", sharingChoice: "private", status: "draft" },
+      { ...base, orgId: meridian.id, authorId: tariq.id, kind: "improvement_suggestion", title: "Draft: explain covenant breaches in plain language", body: "Early notes, not ready to share.", sharingChoice: "private", status: "draft", submittedAt: null },
       { ...base, orgId: zahra.id, authorId: fatima.id, offering: "document-intelligence", title: "Handwritten claim forms lower extraction accuracy", body: "Handwritten fields on legacy claim forms are extracted with noticeably lower confidence than printed fields.", industry: "Insurance", region: "Middle East & Africa", observationPeriod: "2026-Q2", sharingChoice: "propose_shared", status: "submitted" },
       { ...base, orgId: nusantara.id, authorId: dewi.id, title: "Returned: please remove branch-level detail", body: "Observation referencing a specific regional branch.", sharingChoice: "propose_shared", status: "returned" },
       { ...base, orgId: atlas.id, authorId: john.id, kind: "product_gap", title: "Rejected duplicate of an existing suggestion", body: "Duplicate content.", sharingChoice: "propose_shared", status: "rejected" },
@@ -123,10 +125,11 @@ async function main() {
     .returning();
 
   // Reviewed shared representations: de-identified wording, reviewed fields only.
+  const pubsBase = { topic: "market_observation" };
   const pubs = await db
     .insert(s.sharedPublications)
     .values([
-      { contributionId: cM.id, title: "Seasonal SME cash flow can be misread as deterioration", body: "Off-season quarters for seasonal SMEs can look like weakening performance when ratios are compared to the prior quarter without seasonal context.", offering: "financial-analysis-intelligence", industry: "Banking", region: "Regional", observationPeriod: "2026-H1", evidenceType: "client_experience", confidence: "medium" },
+      { contributionId: cM.id, title: "Seasonal SME cash flow can be misread as deterioration", body: "Off-season quarters for seasonal SMEs can look like weakening performance when ratios are compared to the prior quarter without seasonal context.", offering: "financial-analysis-intelligence", industry: "Banking", region: "Regional", observationPeriod: "2026-H1", evidenceType: "client_experience", confidence: "medium", evidenceQuality: "moderate", ...pubsBase },
       { contributionId: cN.id, title: "Harvest-cycle receipts overstate volatility", body: "Quarter-on-quarter comparison of cycle-driven borrowers overstates volatility and can prompt unnecessary reviews.", offering: "financial-analysis-intelligence", industry: "Lending", region: "Regional", observationPeriod: "2026-H1", evidenceType: "client_experience", confidence: "medium" },
       { contributionId: cA.id, title: "Seasonal demand distorts working-capital ratios", body: "Working-capital ratios for seasonal distributors swing sharply and are hard to explain without a seasonality-aware comparison.", offering: "financial-analysis-intelligence", industry: "Trading", region: "Regional", observationPeriod: "2026-H1", evidenceType: "client_experience", confidence: "medium" },
       { contributionId: cZ1.id, title: "Mixed-language forms are mis-classified", body: "Forms combining two scripts can be mis-classified by extraction without locale-aware parsing.", offering: "document-intelligence", industry: "Insurance", region: "Regional", observationPeriod: "2026-Q2", evidenceType: "client_experience", confidence: "low" },
@@ -134,7 +137,23 @@ async function main() {
     ])
     .returning();
 
-  await db.insert(s.searchDocuments).values(pubs.map((p) => ({ publicationId: p.id, text: `${p.title} ${p.body}` })));
+  // Built exactly as publication does it: the search index and AIRA retrieval chunks come from the reviewed copy only.
+  for (const p of pubs) await indexPublication(db, p);
+  await db.update(s.sharedPublications).set({ topic: "market_observation" });
+
+  // The moderator's reviewed copies and the author-visible status history.
+  const pubOf = (cid: string) => pubs.find((p) => p.contributionId === cid)!;
+  await db.insert(s.reviewDrafts).values([cM, cN, cA, cZ1, cZ2].map((c) => {
+    const p = pubOf(c.id);
+    return { contributionId: c.id, title: p.title, body: p.body, offering: p.offering, industry: p.industry, region: p.region, observationPeriod: p.observationPeriod, evidenceType: p.evidenceType, confidence: p.confidence, attribution: "anonymous", evidenceQuality: p.evidenceQuality, topic: "market_observation", updatedBy: omar.id };
+  }));
+  const ev = (contributionId: string, steps: Array<[string | null, string, string, string | null]>) =>
+    steps.map(([fromStatus, toStatus, actorType, note], i) => ({ contributionId, fromStatus, toStatus, actorType, note, at: new Date(Date.now() - (steps.length - i) * 3_600_000 * 8) }));
+  await db.insert(s.contributionEvents).values([
+    ...[cM, cN, cZ1, cZ2].flatMap((c) => ev(c.id, [[null, "draft", "author", "Draft created, private to you"], ["draft", "submitted", "author", "Submitted for review"], ["submitted", "approved", "moderator", "Approved by a moderator"], ["approved", "published", "moderator", "Shared with the learning community"]])),
+    ...ev(cA.id, [[null, "draft", "author", "Draft created, private to you"], ["draft", "submitted", "author", "Submitted for review"], ["submitted", "returned", "moderator", "Please confirm the observation period."], ["returned", "submitted", "author", "Amended and resubmitted"], ["submitted", "approved", "moderator", "Approved by a moderator"], ["approved", "published", "moderator", "Shared with the learning community"]]),
+    ...ev(cRejected.id, [[null, "draft", "author", "Draft created, private to you"], ["draft", "submitted", "author", "Submitted for review"], ["submitted", "rejected", "moderator", "Duplicate of an existing contribution."]]),
+  ]);
 
   // Moderation trail, including the one clarification request from the scenario. Private notes stay private.
   await db.insert(s.moderationActions).values([

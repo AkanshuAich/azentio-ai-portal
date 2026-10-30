@@ -10,6 +10,7 @@ const LINKS = [
   { id: "teams", href: "/employee/teams", label: "Hackathon" },
   { id: "knowledge", href: "/employee/knowledge", label: "Knowledge" },
   { id: "releases", href: "/employee/releases", label: "Release notes" },
+  { id: "learning", href: "/employee/learning", label: "Shared learning" },
 ] as const;
 
 /** Page chrome only. Showing or hiding a link never grants or removes access: every page and API checks the server. */
@@ -17,12 +18,20 @@ export function EmployeeShell({
   session, active, title, lead, children,
 }: { session: SessionContext; active: string; title: string; lead?: string; children: React.ReactNode }) {
   const canPublish = session.principal.permissions.has("media.publish");
+  const canModerate = session.principal.permissions.has("learning.moderate");
+  const canIdeas = session.principal.permissions.has("ideas.manage");
+  // Display only. Each of these pages and APIs checks its own grant on the server.
+  const extra = [
+    ...(canModerate ? [{ id: "moderation", href: "/employee/moderation", label: "Moderation" }, { id: "themes", href: "/employee/themes", label: "Themes" }] : []),
+    ...(canIdeas ? [{ id: "ideas", href: "/employee/ideas", label: "Ideas" }] : []),
+    ...(canPublish ? [{ id: "publishing", href: "/employee/publishing", label: "Publishing" }] : []),
+  ];
   return (
     <>
       <PortalHeader displayName={session.user.displayName} activeOrgId={session.principal.activeOrgId} workspaces={session.workspaces} />
       <nav aria-label="Employee portal" className="border-b border-panel bg-white">
         <ul className="mx-auto flex max-w-[1200px] gap-1 overflow-x-auto px-6 text-sm">
-          {[...LINKS, ...(canPublish ? [{ id: "publishing", href: "/employee/publishing", label: "Publishing" }] : [])].map((l) => (
+          {[...LINKS, ...extra].map((l) => (
             <li key={l.id}>
               <Link
                 href={l.href}

@@ -5,3 +5,4 @@ export * from "./learning";
 export * from "./public";
 export * from "./employee";
 export * from "./client";
+export * from "./insights";

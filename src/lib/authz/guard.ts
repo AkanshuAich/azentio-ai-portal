@@ -17,6 +17,8 @@ export interface AuditRecord {
   orgId: string | null;
   allowed: boolean;
   reason: string;
+  /** Extra structured context, e.g. the from/to states of a lifecycle transition. */
+  detail?: Record<string, unknown>;
 }
 
 /** Injected so the guard stays testable; production wires this to audit_events. */

@@ -25,6 +25,11 @@ export const contributions = pgTable(
     sharingChoice: sharingChoice("sharing_choice").notNull().default("private"),
     status: contributionStatus("status").notNull().default("draft"),
     sensitiveFlags: jsonb("sensitive_flags").$type<string[]>().notNull().default([]),
+    // Bumped on each material edit after publication, so a new version can be re-reviewed.
+    version: integer("version").notNull().default(1),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    // Set only by the author's explicit "share with my organisation" action. Saving never sets it.
+    orgSharedAt: timestamp("org_shared_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -49,6 +54,12 @@ export const sharedPublications = pgTable(
     attribution: attributionMode("attribution").notNull().default("anonymous"),
     publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
     withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    // Replaced by a newer reviewed version.
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    // Reviewer-assessed (strong | moderate | limited). Not a popularity measure.
+    evidenceQuality: text("evidence_quality"),
+    // Reviewed topic (the kind of observation), used for the feed's topic filter.
+    topic: text("topic"),
   },
   (t) => [uniqueIndex("shared_pub_contrib_version").on(t.contributionId, t.version)],
 );
@@ -59,6 +70,7 @@ export const moderationActions = pgTable("moderation_actions", {
   moderatorId: uuid("moderator_id").notNull().references(() => users.id),
   action: text("action").notNull(),
   publicReason: text("public_reason"),
+  toStatus: text("to_status"),
   privateNotes: text("private_notes"), // internal reviewer notes: never in a shared payload
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -68,6 +80,10 @@ export const contributionReports = pgTable("contribution_reports", {
   publicationId: uuid("publication_id").notNull().references(() => sharedPublications.id),
   reporterId: uuid("reporter_id").notNull().references(() => users.id), // never disclosed to the author
   reason: text("reason").notNull(),
+  status: text("status").notNull().default("open"), // open | resolved
+  resolution: text("resolution"),
+  resolvedBy: uuid("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });
 

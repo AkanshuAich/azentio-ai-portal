@@ -12,7 +12,7 @@ export function dbAuditSink(db: Db): AuditSink {
       subjectId: r.subjectId,
       orgId: r.orgId,
       allowed: r.allowed,
-      detail: { reason: r.reason },
+      detail: { reason: r.reason, ...(r.detail ?? {}) },
     });
   };
 }

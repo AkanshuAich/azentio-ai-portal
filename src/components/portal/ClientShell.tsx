@@ -5,6 +5,9 @@ import type { SessionContext } from "@/lib/auth/session";
 const LINKS = [
   { id: "dashboard", href: "/workspace/dashboard", label: "Dashboard" },
   { id: "demos", href: "/workspace/demos", label: "Demonstrations" },
+  { id: "observations", href: "/workspace/observations", label: "My observations" },
+  { id: "learning", href: "/workspace/learning", label: "Shared learning" },
+  { id: "themes", href: "/workspace/themes", label: "Themes" },
   { id: "resources", href: "/workspace/resources", label: "Resources" },
   { id: "support", href: "/workspace/support", label: "Support" },
 ] as const;
