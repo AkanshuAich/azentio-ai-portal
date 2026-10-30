@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, date, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, date, integer, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { audienceKind } from "./enums";
 import { organizations } from "./identity";
 
@@ -17,6 +17,8 @@ export const mediaAssets = pgTable("media_assets", {
   title: text("title").notNull(),
   kind: text("kind").notNull(),
   storageKey: text("storage_key").notNull(),
+  contentType: text("content_type").notNull(),
+  byteSize: integer("byte_size").notNull(),
   audience: audienceKind("audience").notNull(),
   ownerOrgId: uuid("owner_org_id").references(() => organizations.id),
   productSlug: text("product_slug"),
@@ -28,6 +30,7 @@ export const liveSessions = pgTable("live_sessions", {
   title: text("title").notNull(),
   startsAt: timestamp("starts_at", { withTimezone: true }),
   streamRef: text("stream_ref"),
+  recordingAssetId: uuid("recording_asset_id").references((): AnyPgColumn => mediaAssets.id),
   audience: audienceKind("audience").notNull(),
   ownerOrgId: uuid("owner_org_id").references(() => organizations.id),
 });
@@ -37,6 +40,7 @@ export const knowledgeArticles = pgTable("knowledge_articles", {
   title: text("title").notNull(),
   body: text("body").notNull(),
   ownerName: text("owner_name").notNull(),
+  createdBy: uuid("created_by"),
   reviewDate: date("review_date").notNull(),
   audience: audienceKind("audience").notNull(),
 });

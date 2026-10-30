@@ -75,3 +75,23 @@ export async function readCode(db: Db, email: string): Promise<string> {
 export async function outboxFor(db: Db, email: string) {
   return db.select().from(s.outboxMessages).where(eq(s.outboxMessages.toEmail, email));
 }
+
+import { createSession, loadSession } from "../../src/lib/auth/session";
+import type { Permission } from "../../src/lib/authz/types";
+
+/** A real employee: approved membership, optional separate grants, principal built from the session. */
+export async function employeePrincipal(db: Db, grants: Permission[] = []) {
+  const o = await organiser(db);
+  const u = await makeUser(db, `emp-${uniq()}@azentio.com`);
+  await makeMembership(db, u.id, (await azentioOrg(db)).id, "employee", { approvedBy: o.id });
+  if (grants.length) await db.insert(s.platformGrants).values(grants.map((permission) => ({ userId: u.id, permission, grantedBy: o.id })));
+  const ctx = (await loadSession(db, (await createSession(db, u.id)).token))!;
+  return { user: u, principal: ctx.principal };
+}
+
+export async function clientPrincipal(db: Db, orgId: string, role: "client_member" | "client_admin" = "client_member") {
+  const u = await makeUser(db, `cli-${uniq()}@client.example`);
+  await makeMembership(db, u.id, orgId, role);
+  const ctx = (await loadSession(db, (await createSession(db, u.id)).token))!;
+  return { user: u, principal: ctx.principal };
+}

@@ -2,6 +2,7 @@ import { config } from "dotenv";
 import { sql } from "drizzle-orm";
 import { createDb } from "./client";
 import * as s from "./schema";
+import { seedEmployeeContent } from "./seed-employee";
 
 config({ path: ".env.local" });
 
@@ -25,7 +26,8 @@ async function main() {
     search_documents, outbox_messages, notifications, improvement_ideas, theme_evidence, themes,
     consents, contribution_reports, moderation_actions, shared_publications, contributions,
     audit_events, demo_enquiries, hackathon_registrations, login_challenges, employee_allowlist, entitlements, sessions, invitations, platform_grants, memberships, users, organizations,
-    release_notes, knowledge_articles, live_sessions, media_assets, products
+    release_notes, knowledge_feedback, knowledge_articles, hackathon_team_members, hackathon_teams, experiments,
+    playground_runs, site_banners, live_sessions, media_assets, products
     RESTART IDENTITY CASCADE`);
 
   // Organisations: Azentio plus FOUR fictional clients, one more than the k=3 threshold so
@@ -168,6 +170,7 @@ async function main() {
   ]);
 
   await db.insert(s.improvementIdeas).values({
+    ownerUserId: ravi.id,
     title: "Seasonality-aware comparison explanation",
     problem: "Analysis compares periods without seasonal context, so seasonal borrowers look weaker off-season.",
     offering: "financial-analysis-intelligence",
@@ -177,6 +180,8 @@ async function main() {
     status: "under_review", // Under review, not a promised delivery.
     themeId: seasonality.id,
   });
+
+  await seedEmployeeContent(db, { priya, omar, lena, ravi });
 
   console.log("Seeded: 5 organisations, 12 users, 8 products, 9 contributions, 2 themes, 1 idea.");
   process.exit(0);

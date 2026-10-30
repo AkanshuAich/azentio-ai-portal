@@ -3,3 +3,4 @@ export * from "./identity";
 export * from "./content";
 export * from "./learning";
 export * from "./public";
+export * from "./employee";

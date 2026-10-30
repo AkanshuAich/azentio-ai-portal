@@ -6,6 +6,7 @@ import type { Db } from "@/lib/db/client";
 import { dbAuditSink } from "@/lib/audit/log";
 import { ForbiddenError, type AuditSink } from "@/lib/authz/guard";
 import { InvitationError } from "./invitations";
+import { NotFoundError, UploadRejected } from "@/lib/employee/service";
 import { SESSION_COOKIE, loadSession, type SessionContext } from "./session";
 
 export async function getSession(): Promise<SessionContext | null> {
@@ -47,6 +48,8 @@ function fail(e: unknown): NextResponse {
     const status = e.code === "invalid_invitation" ? 404 : 400;
     return NextResponse.json({ error: e.code }, { status });
   }
+  if (e instanceof NotFoundError) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (e instanceof UploadRejected) return NextResponse.json({ error: "upload_rejected", reason: e.reason }, { status: 400 });
   if (e instanceof ZodError) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   console.error(e);
   return NextResponse.json({ error: "server_error" }, { status: 500 });
@@ -94,6 +97,28 @@ export function authedRoute(handler: Handler<AuthedContext>, opts: { mutating?: 
       if (!session) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
       const db = getDb();
       return await handler(req, { db, session, audit: dbAuditSink(db), params: await arg.params });
+    } catch (e) {
+      return fail(e);
+    }
+  };
+}
+
+export interface PolicyContext {
+  db: Db;
+  /** Null for an anonymous caller. The handler MUST run the policy engine against the resource itself. */
+  session: SessionContext | null;
+  params: Record<string, string>;
+}
+
+/**
+ * A route that serves resources with their own audience (e.g. media): it works anonymously for public
+ * resources and with a session for the rest, and the handler decides per resource via the policy engine.
+ */
+export function policyRoute(handler: Handler<PolicyContext>, opts: { mutating?: boolean } = { mutating: false }) {
+  return async (req: Request, arg: RouteArg) => {
+    try {
+      if (opts.mutating !== false && !sameOrigin(req)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return await handler(req, { db: getDb(), session: await getSession(), params: await arg.params });
     } catch (e) {
       return fail(e);
     }

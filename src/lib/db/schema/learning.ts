@@ -105,6 +105,8 @@ export const improvementIdeas = pgTable("improvement_ideas", {
   offering: text("offering").notNull(),
   proposedOutcome: text("proposed_outcome"),
   ownerTeam: text("owner_team").notNull(),
+  // The assigned product owner. Assignment grants access only to evidence shared for that purpose.
+  ownerUserId: uuid("owner_user_id").references(() => users.id),
   priority: text("priority"),
   status: ideaStatus("status").notNull().default("proposed"),
   themeId: uuid("theme_id").references(() => themes.id),
