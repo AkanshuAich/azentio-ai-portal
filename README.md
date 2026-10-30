@@ -15,11 +15,13 @@ npm test            # policy engine + acceptance tests
 npm run typecheck
 ```
 
-Status: Phases 0-1 complete.
+Status: Phases 0-2 complete.
 - Phase 0: schema, design tokens, authz policy engine, audit sink, seed.
 - Phase 1: email-code sign-in, organiser-approved employee provisioning, single-use invitations,
   terms step, active-workspace switcher, CSRF origin checks.
-Not yet built: public site, employee/client portals, learning workflow, AIRA.
+- Phase 2: branded public site (home, products, solutions, technology, lab, media, insights, about),
+  demo-enquiry and hackathon forms with shared client/server validation, public AIRA over public content only.
+Not yet built: employee/client portals, learning workflow, signed-in AIRA.
 
 Local notes
 - Postgres runs on host port 5433 (5432 is often taken by a local install).

@@ -24,7 +24,7 @@ async function main() {
   await db.execute(sql`TRUNCATE TABLE
     search_documents, outbox_messages, notifications, improvement_ideas, theme_evidence, themes,
     consents, contribution_reports, moderation_actions, shared_publications, contributions,
-    audit_events, login_challenges, employee_allowlist, entitlements, sessions, invitations, platform_grants, memberships, users, organizations,
+    audit_events, demo_enquiries, hackathon_registrations, login_challenges, employee_allowlist, entitlements, sessions, invitations, platform_grants, memberships, users, organizations,
     release_notes, knowledge_articles, live_sessions, media_assets, products
     RESTART IDENTITY CASCADE`);
 
