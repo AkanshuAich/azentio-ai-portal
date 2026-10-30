@@ -6,3 +6,4 @@ export * from "./public";
 export * from "./employee";
 export * from "./client";
 export * from "./insights";
+export * from "./federated";

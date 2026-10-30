@@ -22,7 +22,7 @@ export function Denied({ title, text }: { title: string; text: string }) {
  * itself. The employee audience, not a menu link, decides; an optional grant narrows it further.
  */
 export async function guardEmployee(
-  grant?: Permission,
+  grant?: Permission | Permission[],
 ): Promise<{ session: SessionContext } | { denied: React.ReactElement }> {
   const session = await getSession();
   if (!session) redirect("/signin");
@@ -30,8 +30,10 @@ export async function guardEmployee(
   if (!can(session.principal, "read", { audience: "employee" }).allow) {
     return { denied: <Denied title="This area is for Azentio employees" text="Your account doesn't have an approved employee membership." /> };
   }
-  if (grant && !session.principal.permissions.has(grant)) {
-    return { denied: <Denied title="You don't have access to this" text={`This needs the ${grant} grant, which is separate from being an employee. Ask a portal administrator if you need it.`} /> };
+  // An array means any one of the listed grants is enough.
+  const grants = grant === undefined ? [] : Array.isArray(grant) ? grant : [grant];
+  if (grants.length && !grants.some((g) => session.principal.permissions.has(g))) {
+    return { denied: <Denied title="You don't have access to this" text={`This needs the ${grants.join(" or ")} grant, which is separate from being an employee. Ask a portal administrator if you need it.`} /> };
   }
   return { session };
 }

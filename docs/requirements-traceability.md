@@ -106,8 +106,15 @@ brief's own normative statements** ("must", "never", "do not"). The tests are na
 
 | Requirement | Status |
 |---|---|
-| Genuine federated training demonstration | ⬜ **designed only**: [federated-learning-design.md](federated-learning-design.md) |
-| Threat model, withdrawal and lineage policy, honest labelling | ⬜ documented in the design; no simulated control is claimed because nothing is built |
+| Isolated synthetic client datasets, local training, coordinator aggregation, holdout vs baselines, skewed-clients run | 🟡 **simulated demonstration built** (in-process, synthetic data); no centralised reference model | `federated-pure`, `federated` |
+| Update validation with reason codes, clipping, poisoning screen, dropout and minimum cohort | ✅ (screen reduces risk, does not eliminate it) | `federated-pure`, `federated` |
+| Optional noise with a declared accountant | 🟡 central DP, trusted coordinator, full participation; off by default, no guarantee claimed when off | `federated-pure` (closed-form check) |
+| **Secure aggregation** | ❌ **not implemented**, not even simulated; labelled on every federated screen | n/a |
+| Candidate registry: never auto-deployed, human decision, two-person rule, rollback | ✅ (deployed = registry state only) | `federated` |
+| Programme enrolment, withdrawal, lineage; training data never in coordinator logs | ✅ withdrawal flags affected models for review; nothing is "untrained" | `federated`, e2e |
+| Separate grants `federated.coordinate` and `federated.approve`; client admin enrols own organisation only | ✅ | `federated`, `route-coverage`, e2e |
+
+Design, differences from it, and what is still only designed: [federated-learning-design.md](federated-learning-design.md) section 9.
 
 ## Cross-cutting
 

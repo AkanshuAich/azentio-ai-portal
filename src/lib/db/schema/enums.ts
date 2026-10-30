@@ -18,6 +18,8 @@ export const permission = pgEnum("permission", [
   "ideas.manage",
   "platform.administer",
   "support.access_private",
+  "federated.coordinate",
+  "federated.approve",
 ]);
 
 // No default anywhere this is used: a row without audience metadata must be denied, not public.

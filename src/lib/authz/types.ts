@@ -28,7 +28,9 @@ export type Permission =
   | "roles.grant"
   | "ideas.manage"
   | "platform.administer"
-  | "support.access_private";
+  | "support.access_private"
+  | "federated.coordinate"
+  | "federated.approve";
 
 export type Action =
   | "read"
@@ -39,7 +41,9 @@ export type Action =
   | "grant_role"
   | "manage_ideas"
   | "administer"
-  | "access_private";
+  | "access_private"
+  | "coordinate_fl"
+  | "approve_fl";
 
 export interface MembershipRecord {
   orgId: string;

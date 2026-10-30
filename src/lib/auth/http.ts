@@ -8,6 +8,7 @@ import { ForbiddenError, type AuditSink } from "@/lib/authz/guard";
 import { InvitationError } from "./invitations";
 import { NotFoundError, UploadRejected } from "@/lib/employee/service";
 import { LifecycleError } from "@/lib/learning/lifecycle";
+import { FederatedError } from "@/lib/federated/errors";
 import { SESSION_COOKIE, loadSession, type SessionContext } from "./session";
 
 export async function getSession(): Promise<SessionContext | null> {
@@ -50,6 +51,7 @@ function fail(e: unknown): NextResponse {
     return NextResponse.json({ error: e.code }, { status });
   }
   if (e instanceof LifecycleError) return NextResponse.json({ error: "illegal_transition", from: e.from, to: e.to }, { status: 409 });
+  if (e instanceof FederatedError) return NextResponse.json({ error: e.code, message: e.message }, { status: e.code === "consent_required" ? 400 : 409 });
   if (e instanceof NotFoundError) return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (e instanceof UploadRejected) return NextResponse.json({ error: "upload_rejected", reason: e.reason }, { status: 400 });
   if (e instanceof SyntaxError || (e instanceof TypeError && /Content-Type|body/i.test(e.message))) return NextResponse.json({ error: "invalid_request" }, { status: 400 });

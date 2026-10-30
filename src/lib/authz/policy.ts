@@ -15,6 +15,8 @@ const PERMISSION_FOR_ACTION: Partial<Record<Action, Permission>> = {
   manage_ideas: "ideas.manage",
   administer: "platform.administer",
   access_private: "support.access_private",
+  coordinate_fl: "federated.coordinate",
+  approve_fl: "federated.approve",
 };
 
 function hasPlatformPermission(p: Principal, perm: Permission): boolean {

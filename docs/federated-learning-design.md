@@ -1,10 +1,11 @@
-# Federated model-learning track (P2): design
+# Federated model-learning track (P2): design and what was built
 
-> **Status: designed, not implemented in this build.** The brief makes this track optional and says a discussion
-> board or central document repository is *not* federated learning. The collective-learning hub that **is** built
+> **Status: a simulated demonstration is built** (sections 1 to 8 are the design; **section 9 says exactly what was
+> built, what differs from the design, and what is still only designed**). The brief makes this track optional and
+> says a discussion board or central document repository is *not* federated learning. The collective-learning hub
 > (contributions, moderation, shared feed, themes, AIRA) is a separate, required workflow and trains nothing.
-> Nothing in the product claims secure aggregation or formal privacy. This document describes what a credible,
-> honestly labelled demonstration would be, so it can be built without changing the access model.
+> **Secure aggregation is not implemented**, and no formal privacy guarantee is claimed unless a run switches
+> noise on and shows its accountant. Everything runs on synthetic data, simulated in-process.
 
 ## 1. Separation from the collective-learning hub
 
@@ -102,3 +103,63 @@ client with its own data directory). Nothing in the existing contribution tables
 5. A candidate registered, not deployed, until a human records a decision; a rollback exercised.
 6. Every simulated control labelled as simulated; no secure-aggregation or privacy claim the code does not earn.
 7. Consent, enrolment and withdrawal records, and a test that training data never appears in coordinator logs.
+
+## 9. What was built, and where it differs from the design
+
+**Where it lives.** Pure modules in `src/lib/federated/` (`data`, `model`, `metrics`, `client`, `aggregate`, `dp`,
+`coordinator`, `faults`); the simulated client environment in `clientEnv.ts` and its only door, `wiring.ts`; the
+service (`service.ts`) and tables `fl_programmes`, `fl_enrolments`, `fl_runs`, `fl_rounds`, `fl_updates`,
+`fl_model_versions`, `fl_decisions` (migration `0010_federated.sql`). Pages: `/employee/federated` and
+`/workspace/federated`. APIs: `/api/fl/*` (employee) and `/api/client/federated/*` (client).
+
+**Acceptance criteria from section 8, and where each is checked.**
+
+| # | Criterion | Status | Evidence |
+|---|---|---|---|
+| 1 | Isolated synthetic datasets; local training touches only its own data | built | `federated-pure.test.ts` (generator, heterogeneity); `federated.test.ts` static rule: only `clientEnv.ts` reads `fl/clients/`, only `wiring.ts` imports it |
+| 2 | A round with participation, weights, update norms | built | per-round table on the employee page; `fl_updates` |
+| 3 | Holdout evaluation vs a baseline, plus a skewed-clients run | built, with one deliberate difference (below) | untrained model and each client trained alone, on a separate holdout; skew test: a very large 95%-artefact client at 67% weight gives 68.5% holdout accuracy vs 77.3% with a 25% weight cap |
+| 4 | Dropout and rejected/invalid update scenarios, logged | built | injected faults: dropout, sign-flip, 100x scale, stale model version, wrong schema, NaN; each rejection carries a reason code |
+| 5 | Candidate registered, not deployed until a human decides; rollback exercised | built | candidate to approved to deployed; two-person rule; rollback restores the previous model if still fit; all tested |
+| 6 | Simulated controls labelled; no unearned claim | built | banner on every federated screen; injected faults labelled; secure aggregation stated as not implemented |
+| 7 | Consent, enrolment, withdrawal records; training data never in coordinator logs | built | enrolment/withdrawal audited; a test searches every persisted coordinator row, audit row and captured console output for client feature values and organisation ids |
+
+**Differences from the design, stated plainly.**
+
+- **No centralised reference model.** The design proposed one inside the experiment harness to show the gap. It was
+  not built, so the comparison says nothing about how close the federated model is to pooling the data. The baselines
+  are the untrained model and each client trained alone for the same number of local steps.
+- **Secure aggregation is not implemented, not even simulated.** The coordinator sees every individual update. That is
+  why it is labelled, and why the privacy claims below are narrow.
+- **Differential privacy is optional and narrow.** With noise on, a run reports a declared accountant: Gaussian
+  mechanism on the aggregate, Renyi composition, client-level, full participation, **trusted coordinator**. It is not
+  secure aggregation and not local DP. In one measured run (multiplier 1, 8 rounds) epsilon was about 17.6 at
+  delta = 1e-5, which is weak, and holdout accuracy fell from about 81% to 72%. With noise off there is no accountant
+  and the page says no guarantee is claimed.
+- **Poisoning screen is deliberately conservative.** A first version rejected honest clients near convergence (on
+  skewed data, honest updates legitimately point in different directions), and the programme stalled with every round
+  abandoned. That was found by running it, fixed (an opposed direction counts only if the update is also larger than
+  typical; raw norm is checked before clipping hides it), and a regression test pins it. The screen reduces risk. A
+  reversed update of normal size, or an attacker staying inside the bounds, is not caught; clipping, the weight cap and
+  the optional trimmed mean limit what such an update can do. In testing, with the screen off a sign-flipping
+  participant dropped fedavg accuracy sharply; trimmed mean held up without the screen.
+- **Accuracy at 0.5 can drift while loss improves.** Over 8 rounds holdout log loss and calibration error improved while
+  accuracy moved about 0.8 points the other way. Charts therefore use a minimum axis span so a small wobble is not
+  drawn as a collapse.
+- **Authorisation.** Two new separate grants, `federated.coordinate` (start runs) and `federated.approve` (decide on
+  models). Neither follows from employee status or from any other grant. Clients enrol and withdraw their own
+  organisation (client administrator only, organisation taken from the session). The design's `programme_participant`
+  audience was not needed: a client sees only its own participation and the deployed model.
+- **Two-person rule.** The person who registered a candidate cannot approve it. The design's "second approval for
+  anything customer-facing" is stricter and is not built; nothing here is customer-facing.
+- **Withdrawal.** Stops future participation and flags every live (candidate, approved, deployed, or superseded and
+  therefore restorable) model the participant contributed to as **needs review**: approval, deployment and rollback
+  restore are blocked until an approver records a note of at least 10 characters. The weights are unchanged: nothing is
+  "untrained", and the UI and tests say so.
+- **"Deployed" is registry state.** Nothing in this portal serves predictions from a federated model.
+- **Row-level security.** `fl_enrolments` carries an organisation column but is deliberately exempt (the coordinator
+  reads across organisations; client reads filter on the session organisation). It is listed with that reason in the
+  RLS exemption test.
+- **Not built:** pairwise-masking secure aggregation; a real network boundary (clients are simulated in-process, with
+  datasets in private storage that no route serves); per-client training in a separate process; asynchronous or
+  late-update handling beyond a client simply failing.

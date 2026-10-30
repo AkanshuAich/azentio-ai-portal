@@ -133,6 +133,7 @@ describe("defence in depth: Postgres row-level security under the app layer", ()
     const EXEMPT: Record<string, string> = {
       audit_events: "append-only trail written for any tenant",
       entitlements: "read during authentication, before a tenant is active",
+      fl_enrolments: "the coordinator (employee audience) reads every enrolment to run the programme; client reads filter on the session organisation in the service and are covered by tests",
       invitations: "looked up by token before the user belongs to the organisation",
       live_sessions: "audience policy decides (public, employee, tenant)",
       media_assets: "audience policy decides (public, employee, tenant, entitled)",

@@ -4,6 +4,7 @@ import { createDb } from "./client";
 import * as s from "./schema";
 import { seedClientContent, seedEmployeeContent } from "./seed-employee";
 import { indexPublication } from "../learning/indexing";
+import { seedFederated } from "./seed-federated";
 
 config({ path: ".env.local" });
 
@@ -24,6 +25,7 @@ async function main() {
 
   // Dev-only reset so the seed is repeatable.
   await db.execute(sql`TRUNCATE TABLE
+    fl_decisions, fl_model_versions, fl_updates, fl_rounds, fl_runs, fl_enrolments, fl_programmes,
     search_documents, outbox_messages, notifications, improvement_ideas, theme_evidence, themes,
     consents, contribution_reports, moderation_actions, shared_publications, contributions,
     review_drafts, contribution_events, idea_evidence, publication_feedback, saved_searches, aira_chunks, app_state,
@@ -90,7 +92,8 @@ async function main() {
   await db.insert(s.platformGrants).values([
     grant(omar.id, "learning.moderate"),
     grant(lena.id, "media.publish"),
-    grant(ravi.id, "ideas.manage"),
+    grant(ravi.id, "ideas.manage"), grant(ravi.id, "federated.coordinate"),
+    grant(sam.id, "federated.approve"),
     grant(sam.id, "platform.administer"), grant(sam.id, "members.invite"), grant(sam.id, "roles.grant"),
   ]);
 
@@ -205,8 +208,13 @@ async function main() {
 
   await seedEmployeeContent(db, { priya, omar, lena, ravi });
   await seedClientContent(db, { meridian, nusantara, amira, tariq });
+  await seedFederated(db, { creator: ravi, orgs: [
+    { org: meridian, admin: amira, profile: "seasonal_heavy" },
+    { org: nusantara, admin: dewi, profile: "genuine_heavy" },
+    { org: zahra, admin: fatima, profile: "balanced" },
+  ] });
 
-  console.log("Seeded: 5 organisations, 12 users, 8 products, 9 contributions, 2 themes, 1 idea.");
+  console.log("Seeded: 5 organisations, 12 users, 8 products, 9 contributions, 2 themes, 1 idea, 1 federated programme (3 enrolled).");
   process.exit(0);
 }
 

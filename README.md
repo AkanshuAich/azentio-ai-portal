@@ -22,8 +22,8 @@ only). Seeded demo users (all fictional):
 | Ordinary employee | priya.nair@azentio.com |
 | Moderator (`learning.moderate`) | omar.haddad@azentio.com |
 | Publisher (`media.publish`) | lena.fischer@azentio.com |
-| Product owner (`ideas.manage`) | ravi.menon@azentio.com |
-| Portal administrator | sam.okafor@azentio.com |
+| Product owner (`ideas.manage`) and federated coordinator (`federated.coordinate`) | ravi.menon@azentio.com |
+| Portal administrator, and federated approver (`federated.approve`) | sam.okafor@azentio.com |
 | Meridian client admin / member | amira.khan@meridian.example / tariq.aziz@meridian.example |
 | Nusantara client admin / member | dewi.lestari@nusantara.example / budi.santoso@nusantara.example |
 | Zahra / Atlas client admins | fatima.zahra@zahra.example / john.mercer@atlas.example |
@@ -31,6 +31,9 @@ only). Seeded demo users (all fictional):
 
 The brief's illustrative scenario (three clients, seasonal SME cash flow, a "Seasonality context" theme with a
 small-sample warning, an Under-review idea) is seeded and replayable.
+
+The optional P2 federated programme is seeded with three enrolled clients (the minimum cohort); Atlas's administrator
+can enrol live at `/workspace/federated`, Ravi runs it at `/employee/federated`, and Sam (a different person) approves.
 
 ## Verify it
 
@@ -51,7 +54,7 @@ The acceptance tests are named after the brief's clauses; see
 | [docs/access-model.md](docs/access-model.md) | personas, grants, audiences, enforcement layers |
 | [docs/threat-model.md](docs/threat-model.md) | threats, mitigations, evidence, residual risks |
 | [docs/consent-and-retention.md](docs/consent-and-retention.md) | consent model, withdrawal and its limits, retention schedule |
-| [docs/federated-learning-design.md](docs/federated-learning-design.md) | the optional P2 track: designed, not built |
+| [docs/federated-learning-design.md](docs/federated-learning-design.md) | the optional P2 track: design, and what was built vs designed |
 | [docs/requirements-traceability.md](docs/requirements-traceability.md) | every requirement: where, how tested, honest status |
 
 ## Honest limits
@@ -61,7 +64,7 @@ The acceptance tests are named after the brief's clauses; see
 - **AIRA's live Claude call has not run against the real API** in this build. With `ANTHROPIC_API_KEY` set it uses
   `claude-opus-5-5` (override with `AIRA_MODEL`); without it, or on any failure, it falls back to a labelled retrieval
   summary. Retrieval is lexical (Postgres full text), not embeddings.
-- **The federated-learning track (P2) is designed, not built.**
+- **The federated-learning track (P2) is a simulated demonstration, not production federated learning.** Synthetic data, clients simulated in-process, **no secure aggregation**, no formal privacy guarantee unless noise is switched on (and then only under a trusted-coordinator assumption), and "deployed" is a registry state only. See `docs/federated-learning-design.md` section 9.
 - **Retention periods are proposed, and automated purge jobs are not implemented.**
 - **RLS covers the `withTenant()` paths**; connect the web app as a non-owner role before production.
 - Uploaded media and recordings use local disk and placeholder slates, not real video.

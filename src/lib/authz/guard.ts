@@ -33,6 +33,8 @@ const AUDITED_ACTIONS = new Set<Action>([
   "manage_ideas",
   "administer",
   "access_private",
+  "coordinate_fl",
+  "approve_fl",
 ]);
 
 export interface GuardContext {

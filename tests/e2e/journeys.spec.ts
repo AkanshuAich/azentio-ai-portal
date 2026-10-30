@@ -176,3 +176,72 @@ test.describe("access boundaries as a user would meet them", () => {
     expect(violations).toEqual([]);
   });
 });
+
+test.describe("the simulated federated programme, end to end", () => {
+  test("a client enrols, a coordinator runs, a different approver decides, and a withdrawal flags the model", async ({ browser }) => {
+    // --- Atlas administrator joins (the fourth organisation; the seed enrolled three) ---------------
+    const atlas = await persona(browser, "john.mercer@atlas.example");
+    const a = atlas.page;
+    await a.goto("/workspace/federated");
+    await expect(a.getByText("SYNTHETIC DATA · SIMULATED PROGRAMME")).toBeVisible();
+    await expect(a.getByRole("note").getByText("Secure aggregation:")).toBeVisible();
+    await expect(a.getByText("Not enrolled.")).toBeVisible();
+    await expect(a.getByRole("button", { name: "Enrol this organisation" })).toBeDisabled();
+    await a.getByLabel(/I have read the four statements/).check();
+    await a.getByRole("button", { name: "Enrol this organisation" }).click();
+    await expect(a.getByText(/Enrolled\. In programme logs you appear only as/)).toBeVisible();
+
+    // --- A member (not an administrator) cannot enrol or withdraw --------------------------------
+    const tariq = await persona(browser, "tariq.aziz@meridian.example");
+    await tariq.page.goto("/workspace/federated");
+    await expect(tariq.page.getByText("Only a client administrator can enrol or withdraw")).toBeVisible();
+    await expect(tariq.page.getByRole("button", { name: /Enrol|Withdraw/ })).toHaveCount(0);
+
+    // --- Ravi (federated.coordinate) runs it with an injected dropout ----------------------------------
+    const ravi = await persona(browser, "ravi.menon@azentio.com");
+    const r = ravi.page;
+    await r.goto("/employee/federated");
+    await expect(r.getByRole("heading", { name: "Participants" })).toBeVisible();
+    await r.getByLabel("Fault").selectOption("dropout");
+    await r.getByRole("button", { name: "Run simulated programme" }).click();
+    await expect(r.getByText(/A candidate model was registered; it is not in use/)).toBeVisible();
+    await expect(r.getByText("Injected fault (demonstration):")).toBeVisible();
+    await expect(r.getByText("Candidate (not in use)").first()).toBeVisible();
+    // Coordinating does not include approving, and he registered it anyway.
+    await expect(r.getByText(/Deciding needs the federated\.approve grant/).first()).toBeVisible();
+    expect((await sql`select count(*)::int as n from fl_model_versions where status = 'deployed'`)[0].n).toBe(0);
+
+    // --- Sam (federated.approve) approves and deploys ---------------------------------------------
+    const sam = await persona(browser, "sam.okafor@azentio.com");
+    const sp = sam.page;
+    await sp.goto("/employee/federated");
+    await expect(sp.getByText(/Starting a run needs the federated\.coordinate grant/)).toBeVisible();
+    await sp.getByRole("button", { name: "Approve" }).first().click();
+    await expect(sp.getByText("Approved ·").first()).toBeVisible();
+    await sp.getByRole("button", { name: /Deploy/ }).first().click();
+    await expect(sp.getByText("Deployed (registry state)").first()).toBeVisible();
+
+    // --- Priya has neither grant -----------------------------------------------------------------
+    const priya = await persona(browser, "priya.nair@azentio.com");
+    await priya.page.goto("/employee/federated");
+    await expect(priya.page.getByText(/needs the federated\.coordinate or federated\.approve grant/)).toBeVisible();
+
+    // --- The member now sees the deployed model's synthetic metrics, and only their own history ---
+    await tariq.page.goto("/workspace/federated");
+    await expect(tariq.page.getByText(/on a synthetic holdout/)).toBeVisible();
+    const html = await tariq.page.content();
+    const refs = (await sql`select participant_ref from fl_enrolments`).map((x) => x.participant_ref as string);
+    expect(refs.filter((x) => html.includes(x)).length).toBeLessThanOrEqual(1);
+
+    // --- Atlas withdraws: the model it contributed to is flagged, not untrained ----------------------
+    a.once("dialog", (d) => d.accept());
+    await a.reload();
+    await a.getByRole("button", { name: "Withdraw this organisation" }).click();
+    await expect(a.getByText("Withdrawn. You are excluded from future runs.")).toBeVisible();
+    await sp.reload();
+    await expect(sp.getByText("Flagged for review.")).toBeVisible();
+    await expect(sp.getByRole("button", { name: "Clear review flag" })).toBeVisible();
+
+    for (const p of [atlas, tariq, ravi, sam, priya]) await p.ctx.close();
+  });
+});

@@ -8,6 +8,7 @@ const LINKS = [
   { id: "observations", href: "/workspace/observations", label: "My observations" },
   { id: "learning", href: "/workspace/learning", label: "Shared learning" },
   { id: "themes", href: "/workspace/themes", label: "Themes" },
+  { id: "federated", href: "/workspace/federated", label: "Federated programme" },
   { id: "resources", href: "/workspace/resources", label: "Resources" },
   { id: "support", href: "/workspace/support", label: "Support" },
 ] as const;

@@ -20,10 +20,12 @@ export function EmployeeShell({
   const canPublish = session.principal.permissions.has("media.publish");
   const canModerate = session.principal.permissions.has("learning.moderate");
   const canIdeas = session.principal.permissions.has("ideas.manage");
+  const canFederated = session.principal.permissions.has("federated.coordinate") || session.principal.permissions.has("federated.approve");
   // Display only. Each of these pages and APIs checks its own grant on the server.
   const extra = [
     ...(canModerate ? [{ id: "moderation", href: "/employee/moderation", label: "Moderation" }, { id: "themes", href: "/employee/themes", label: "Themes" }] : []),
     ...(canIdeas ? [{ id: "ideas", href: "/employee/ideas", label: "Ideas" }] : []),
+    ...(canFederated ? [{ id: "federated", href: "/employee/federated", label: "Federated" }] : []),
     ...(canPublish ? [{ id: "publishing", href: "/employee/publishing", label: "Publishing" }] : []),
   ];
   return (

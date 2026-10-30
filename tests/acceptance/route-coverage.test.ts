@@ -165,7 +165,7 @@ describe("IAM-01 every protected API refuses an anonymous caller", () => {
 });
 
 describe("IAM-01/02 a signed-in user of the wrong kind never succeeds on the other persona's APIs", () => {
-  const EMPLOYEE_ONLY = ["moderation", "ideas", "publishing", "experiments", "teams", "knowledge", "release-notes", "playground"];
+  const EMPLOYEE_ONLY = ["moderation", "ideas", "publishing", "experiments", "teams", "knowledge", "release-notes", "playground", "fl"];
   const CLIENT_ONLY = ["client", "contributions", "bookmarks", "comments"];
   const topOf = (f: string) => rel(f).split("/")[3];
 
@@ -180,7 +180,7 @@ describe("IAM-01/02 a signed-in user of the wrong kind never succeeds on the oth
     return { count: targets.length, unexpected };
   }
 
-  it("a client member cannot use any employee-only API (moderation, ideas, publishing, experiments, teams, knowledge, release notes, playground)", async () => {
+  it("a client member cannot use any employee-only API (moderation, ideas, publishing, experiments, teams, knowledge, release notes, playground, federated coordination)", async () => {
     const c = await clientPrincipal(db, (await makeClientOrg(db)).id, "client_admin");
     const { token } = await createSession(db, c.user.id);
     const r = await sweep(token, EMPLOYEE_ONLY);
@@ -191,7 +191,7 @@ describe("IAM-01/02 a signed-in user of the wrong kind never succeeds on the oth
   it("an ordinary employee (no grants) cannot use privileged APIs, and gets no access to any client workspace API", async () => {
     const e = await employeePrincipal(db);
     const { token } = await createSession(db, e.user.id);
-    const priv = await sweep(token, ["moderation", "ideas", "publishing"]);
+    const priv = await sweep(token, ["moderation", "ideas", "publishing", "fl"]);
     expect(priv.unexpected).toEqual([]);
     const client = await sweep(token, CLIENT_ONLY);
     expect(client.count).toBeGreaterThan(25);
@@ -264,6 +264,8 @@ describe("IAM-01 page coverage: every protected page checks the server-side sess
       "employee/ideas/page.tsx": "ideas.manage", "employee/ideas/[id]/page.tsx": "ideas.manage",
     };
     for (const [p, grant] of Object.entries(need)) expect(readFileSync(path.join(ROOT, "src/app", p), "utf8"), p).toContain(`guardEmployee("${grant}")`);
+    // Either of two separate federated grants opens the programme page; each action behind it checks its own.
+    expect(readFileSync(path.join(ROOT, "src/app/employee/federated/page.tsx"), "utf8")).toContain('guardEmployee(["federated.coordinate", "federated.approve"])');
   });
 
   it("the development mailbox does not exist in production", () => {
