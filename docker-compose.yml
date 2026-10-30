@@ -1,12 +1,15 @@
+# Local development database only. The password comes from .env.local (see .env.example); nothing secret is committed.
+# Start it with: npm run db:up
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: azentio
-      POSTGRES_PASSWORD: azentio_dev_only
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run "npm run setup" first so .env.local defines POSTGRES_PASSWORD}
       POSTGRES_DB: azentio_ai
     ports:
-      - "5433:5432"
+      # Bound to this machine only, so the database is not reachable from the network.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

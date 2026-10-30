@@ -44,16 +44,19 @@ The AI assistant (AIRA) uses the Claude API when a key is set and a deterministi
 ```bash
 git clone https://github.com/AkanshuAich/azentio-ai-portal.git
 cd azentio-ai-portal
-cp .env.example .env.local
-docker compose up -d
 npm install
+npm run setup      # creates .env.local with a random database password and session secret
+npm run db:up      # starts Postgres in Docker
 npm run db:migrate
 npm run db:seed
 npm run dev
 ```
 
-Open <http://localhost:3000>. That is the public site. Postgres is exposed on host port **5433**, not 5432, because
-5432 is often already taken.
+Open <http://localhost:3000>. That is the public site. Postgres is exposed on host port **5433** (not 5432, which is
+often already taken) and only on your own machine.
+
+**No passwords are stored in the repo.** `npm run setup` generates them into `.env.local`, which is git-ignored.
+`.env.example` only holds placeholders.
 
 ### Signing in
 
@@ -93,12 +96,14 @@ the form cannot be used to find out who has an account. The dev mailbox does not
 
 ## Configuration
 
-Copy `.env.example` to `.env.local`. The defaults work for local development.
+`npm run setup` creates `.env.local` from `.env.example` (it never overwrites an existing one). The defaults work for
+local development.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `DATABASE_URL` | Postgres connection string | points at the Docker database on port 5433 |
-| `SESSION_SECRET` | Signs session and code hashes. **Change it** (32+ random characters) outside local use | placeholder |
+| `POSTGRES_PASSWORD` | Password for the Docker database. Must match the password in `DATABASE_URL` | random, from `npm run setup` |
+| `DATABASE_URL` | Postgres connection string | Docker database on port 5433 |
+| `SESSION_SECRET` | Signs session and code hashes. Use a different long random value in any real deployment | random, from `npm run setup` |
 | `MIN_DISTINCT_ORGS` | Minimum different organisations before a theme or trend is shown | `3` |
 | `ANTHROPIC_API_KEY` | Enables live Claude answers in AIRA. Optional | empty: fallback summaries |
 | `AIRA_MODEL` | Overrides the AIRA model | `claude-opus-5-5` |
@@ -109,6 +114,8 @@ Copy `.env.example` to `.env.local`. The defaults work for local development.
 
 | Command | What it does |
 |---|---|
+| `npm run setup` | Create `.env.local` with generated secrets (once) |
+| `npm run db:up` / `npm run db:down` | Start / stop the local Postgres container |
 | `npm run dev` | Development server with hot reload |
 | `npm run build` / `npm start` | Production build and server |
 | `npm run db:migrate` | Apply database migrations |
@@ -124,7 +131,7 @@ The tests are the main evidence that the access rules hold, so they are written 
 
 - **389 unit and acceptance tests**, named after the brief's clauses (for example *IAM-01*, *IAM-02*). They create their
   own throwaway database (`azentio_test`) from the real migrations on every run, so they never touch your demo data.
-  Needs Docker Postgres running and `.env.local` present.
+  Needs the Docker database running (`npm run db:up`) and `.env.local` present.
 - **Route and page sweeps** fail the build if any API route or protected page skips its check, and call every route
   as the wrong kind of user to confirm none succeeds.
 - **8 Playwright journeys** drive a real browser through each persona against an isolated database (`azentio_e2e`,
@@ -209,8 +216,12 @@ Some folders appear after you run things. None of them is source code, and none 
   `rm -rf .next` (macOS/Linux/Git Bash) or `Remove-Item -Recurse -Force .next` (PowerShell).
 - **Cannot connect to the database.** Check `docker compose ps`. The app expects port **5433**; change `DATABASE_URL`
   and `docker-compose.yml` together if you need another port.
+- **`password authentication failed`, or Compose says `POSTGRES_PASSWORD` is not set.** The password is read from
+  `.env.local`. Postgres sets it only when the data volume is first created, so if you change it afterwards the old
+  volume keeps the old password. Either restore the old value, or rebuild the volume (next item). If `.env.local`
+  predates `npm run setup`, add a `POSTGRES_PASSWORD=` line with the password the database was created with.
 - **Want a clean slate.** `npm run db:seed` resets the data. To rebuild the database itself:
-  `docker compose down -v`, then `docker compose up -d`, `npm run db:migrate`, `npm run db:seed`.
+  `npm run db:down -- -v`, then `npm run db:up`, `npm run db:migrate`, `npm run db:seed`.
 - **Port 3000 is busy.** `npx next dev --turbopack -p 3100`.
 
 ## Documentation
