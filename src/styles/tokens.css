@@ -1,0 +1,25 @@
+/* Brand tokens read from azentio.com (corporate) and the azentio.ai prototype. */
+:root {
+  /* azentio.com */
+  --az-mint: #55ffbe;
+  --az-green: #22e0a0;
+  --az-ink: #1e2a33;
+  --az-text: #26363f;
+  --az-muted: #8aa0ab;
+  --az-card: #16303d;
+  --az-cta-dark: #162832;
+  --az-panel: #f3f5f6;
+  --az-footer: #0e1b1b;
+  /* azentio.ai prototype */
+  --az-navy: #171b3a;
+  --az-leaf: #69d393;
+  --az-light: #f5f7f9;
+  /* Accent text on light surfaces: #55ffbe is ~1.4:1 on white, so it is a fill/border only. */
+  --az-accent-text: #0a6e52;
+
+  --az-radius: 10px;
+  --az-radius-lg: 12px;
+  --az-radius-pill: 999px;
+  --az-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --az-maxw: 1200px;
+}

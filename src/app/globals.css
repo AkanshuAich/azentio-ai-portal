@@ -1,0 +1,29 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme inline {
+  --color-mint: var(--az-mint);
+  --color-green: var(--az-green);
+  --color-ink: var(--az-ink);
+  --color-text: var(--az-text);
+  --color-muted: var(--az-muted);
+  --color-card: var(--az-card);
+  --color-navy: var(--az-navy);
+  --color-leaf: var(--az-leaf);
+  --color-panel: var(--az-panel);
+  --color-accent-text: var(--az-accent-text);
+  --font-sans: var(--font-poppins), system-ui, sans-serif;
+  --radius-az: var(--az-radius);
+  --radius-az-lg: var(--az-radius-lg);
+}
+
+body {
+  background: #fff;
+  color: var(--az-text);
+  font-family: var(--font-poppins), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--az-mint);
+  outline-offset: 2px;
+}

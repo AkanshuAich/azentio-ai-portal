@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: azentio
+      POSTGRES_PASSWORD: azentio_dev_only
+      POSTGRES_DB: azentio_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U azentio -d azentio_ai"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
