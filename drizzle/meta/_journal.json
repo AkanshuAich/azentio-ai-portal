@@ -8,6 +8,13 @@
       "when": 1793369500567,
       "tag": "0000_cold_dazzler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793369814929,
+      "tag": "0001_romantic_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

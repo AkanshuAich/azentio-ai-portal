@@ -123,8 +123,13 @@ export const notifications = pgTable("notifications", {
 export const outboxMessages = pgTable("outbox_messages", {
   id: uuid("id").primaryKey().defaultRandom(),
   idempotencyKey: text("idempotency_key").notNull().unique(),
-  toUserId: uuid("to_user_id").notNull().references(() => users.id),
+  toUserId: uuid("to_user_id").references(() => users.id),
+  toEmail: text("to_email"),
+  subject: text("subject"),
+  // Secret-bearing bodies (sign-in codes, invitation links) are redacted once handed to a real transport.
+  body: text("body"),
   channel: text("channel").notNull().default("email"),
+  // queued -> dev_logged | sent. "sent" means handed to a provider, never "delivered".
   state: text("state").notNull().default("queued"),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });

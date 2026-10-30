@@ -24,7 +24,7 @@ async function main() {
   await db.execute(sql`TRUNCATE TABLE
     search_documents, outbox_messages, notifications, improvement_ideas, theme_evidence, themes,
     consents, contribution_reports, moderation_actions, shared_publications, contributions,
-    audit_events, entitlements, sessions, invitations, platform_grants, memberships, users, organizations,
+    audit_events, login_challenges, employee_allowlist, entitlements, sessions, invitations, platform_grants, memberships, users, organizations,
     release_notes, knowledge_articles, live_sessions, media_assets, products
     RESTART IDENTITY CASCADE`);
 
@@ -62,9 +62,9 @@ async function main() {
     .returning();
   const [priya, omar, lena, ravi, sam, amira, tariq, dewi, budi, fatima, john, yusuf] = U;
 
-  const emp = (userId: string) => ({ userId, orgId: az.id, role: "employee" as const, status: "active" as const, approvedBy: sam.id });
+  const emp = (userId: string) => ({ userId, orgId: az.id, role: "employee" as const, status: "active" as const, approvedBy: sam.id, termsAcceptedAt: now });
   const cli = (userId: string, orgId: string, role: "client_member" | "client_admin") =>
-    ({ userId, orgId, role, status: "active" as const, approvedBy: null });
+    ({ userId, orgId, role, status: "active" as const, approvedBy: null, termsAcceptedAt: now });
   await db.insert(s.memberships).values([
     emp(priya.id), emp(omar.id), emp(lena.id), emp(ravi.id), emp(sam.id),
     cli(amira.id, meridian.id, "client_admin"), cli(tariq.id, meridian.id, "client_member"),
@@ -73,6 +73,11 @@ async function main() {
     // One user with two memberships, to exercise the explicit workspace switcher.
     cli(yusuf.id, meridian.id, "client_member"), cli(yusuf.id, atlas.id, "client_member"),
   ]);
+
+  // Organiser-approved employee identities (plus one pending hire who has not signed in yet).
+  await db.insert(s.employeeAllowlist).values(
+    ["priya.nair", "omar.haddad", "lena.fischer", "ravi.menon", "sam.okafor", "new.hire"].map((n) => ({ email: `${n}@azentio.com`, approvedBy: sam.id })),
+  );
 
   // Separate grants. Priya is an ordinary employee and holds none.
   const grant = (userId: string, permission: typeof s.platformGrants.$inferInsert["permission"]) =>

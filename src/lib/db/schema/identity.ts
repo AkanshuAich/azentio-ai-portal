@@ -1,5 +1,5 @@
 import {
-  pgTable, uuid, text, timestamp, boolean, uniqueIndex, index, jsonb,
+  pgTable, uuid, text, timestamp, boolean, uniqueIndex, index, jsonb, integer,
 } from "drizzle-orm/pg-core";
 import { orgKind, membershipRole, membershipStatus, permission } from "./enums";
 
@@ -32,9 +32,33 @@ export const memberships = pgTable(
     status: membershipStatus("status").notNull(),
     // Employee memberships need organiser approval on top of a verified @azentio.com identity.
     approvedBy: uuid("approved_by").references(() => users.id),
+    // Workspace terms and the learning-sharing explanation. Accepting is NOT consent to share or train.
+    termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("memberships_user_org").on(t.userId, t.orgId)],
+);
+
+// Organiser-approved @azentio.com identities. The suffix alone never grants employee status.
+export const employeeAllowlist = pgTable("employee_allowlist", {
+  email: text("email").primaryKey(),
+  approvedBy: uuid("approved_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One-time email codes. Only a keyed hash of the code is stored.
+export const loginChallenges = pgTable(
+  "login_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("login_challenges_email").on(t.email)],
 );
 
 // One row per grant, so publish / moderate / invite / grant-roles stay independent (IAM-02).
@@ -67,6 +91,8 @@ export const invitations = pgTable("invitations", {
 
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
+  // The cookie carries a random token; only its hash is stored.
+  tokenHash: text("token_hash").notNull().unique(),
   userId: uuid("user_id").notNull().references(() => users.id),
   activeOrgId: uuid("active_org_id").references(() => organizations.id),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),

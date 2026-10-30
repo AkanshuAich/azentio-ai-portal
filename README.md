@@ -15,5 +15,14 @@ npm test            # policy engine + acceptance tests
 npm run typecheck
 ```
 
-Status: Phase 0 (foundation) complete: schema, design tokens, authz core with tests, audit sink, seed.
-Not yet built: auth flows, public site, employee/client portals, learning workflow, AIRA.
+Status: Phases 0-1 complete.
+- Phase 0: schema, design tokens, authz policy engine, audit sink, seed.
+- Phase 1: email-code sign-in, organiser-approved employee provisioning, single-use invitations,
+  terms step, active-workspace switcher, CSRF origin checks.
+Not yet built: public site, employee/client portals, learning workflow, AIRA.
+
+Local notes
+- Postgres runs on host port 5433 (5432 is often taken by a local install).
+- No email provider is wired in: sign-in codes and invitation links land in the outbox and are shown at
+  /dev/mailbox in development only. Production refuses to start sending until MAIL_TRANSPORT is set.
+- Tests recreate a throwaway `azentio_test` database from the real migrations on every run.
